@@ -1,0 +1,53 @@
+# docker compose up
+#
+# Two profiles, because a reviewer without a Devin API key must still be able to
+# watch the system work:
+#
+#   default   the real thing -- receives GitHub webhooks, spends ACUs
+#   simulate  replays recorded sessions from ratchet/fixtures/, spends nothing
+#
+#   docker compose --profile simulate up
+
+services:
+  orchestrator:
+    build: ./ratchet
+    env_file: .env
+    ports:
+      - "8099:8099"
+    volumes:
+      # The repository under measurement. Read-only: this container measures the
+      # tree, it never edits it -- everything that changes code goes through a
+      # Devin session and a reviewable pull request.
+      - ./superset-adham-clone:/repo:ro
+      # State outlives the container. The ACU ledger is the reason: an
+      # orchestrator that forgets what it spent is not a budget control.
+      - ./ratchet/state.db:/app/state.db
+      - ./baseline:/app/baseline:ro
+    environment:
+      REPO_PATH: /repo
+      WEBHOOK_PORT: 8099
+    restart: unless-stopped
+
+  dashboard:
+    build: ./ratchet
+    env_file: .env
+    command: ["python3", "/app/orchestrator/dashboard.py"]
+    ports:
+      - "8100:8100"
+    volumes:
+      - ./ratchet/state.db:/app/state.db
+      - ./baseline:/app/baseline:ro
+    restart: unless-stopped
+
+  simulate:
+    build: ./ratchet
+    profiles: ["simulate"]
+    command: ["python3", "/app/orchestrator/simulate.py"]
+    volumes:
+      - ./ratchet/fixtures:/app/fixtures:ro
+      - ./baseline:/app/baseline:ro
+    environment:
+      # No API key is read in this profile. The absence is the point: a reviewer
+      # can run the whole pipeline against recorded sessions with no credentials
+      # and no spend.
+      SIMULATE: "1"

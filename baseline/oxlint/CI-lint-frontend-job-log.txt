@@ -1,0 +1,399 @@
+﻿2026-07-30T17:41:18.7031489Z Current runner version: '2.336.0'
+2026-07-30T17:41:18.7056304Z ##[group]Runner Image Provisioner
+2026-07-30T17:41:18.7057151Z Hosted Compute Agent
+2026-07-30T17:41:18.7057710Z Version: 20260707.563
+2026-07-30T17:41:18.7058427Z Commit: 02667638d2b423fbc733a8e32a88b44996a3ba6e
+2026-07-30T17:41:18.7059170Z Build Date: 2026-07-07T19:33:50Z
+2026-07-30T17:41:18.7059874Z Worker ID: {36e16f28-d520-4dc5-b5e7-b39946ea00b5}
+2026-07-30T17:41:18.7060590Z Azure Region: westus2
+2026-07-30T17:41:18.7061138Z ##[endgroup]
+2026-07-30T17:41:18.7062675Z ##[group]Operating System
+2026-07-30T17:41:18.7063342Z Ubuntu
+2026-07-30T17:41:18.7063826Z 26.04
+2026-07-30T17:41:18.7064763Z LTS
+2026-07-30T17:41:18.7065387Z ##[endgroup]
+2026-07-30T17:41:18.7065991Z ##[group]Runner Image
+2026-07-30T17:41:18.7066643Z Image: ubuntu-26.04
+2026-07-30T17:41:18.7067202Z Version: 20260720.80.1
+2026-07-30T17:41:18.7068498Z Included Software: https://github.com/actions/runner-images/blob/ubuntu26/20260720.80/images/ubuntu/Ubuntu2604-Readme.md
+2026-07-30T17:41:18.7070380Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu26%2F20260720.80
+2026-07-30T17:41:18.7071395Z ##[endgroup]
+2026-07-30T17:41:18.7072447Z ##[group]GITHUB_TOKEN Permissions
+2026-07-30T17:41:18.7075037Z Contents: read
+2026-07-30T17:41:18.7075646Z Metadata: read
+2026-07-30T17:41:18.7076319Z ##[endgroup]
+2026-07-30T17:41:18.7078505Z Secret source: Actions
+2026-07-30T17:41:18.7079844Z Prepare workflow directory
+2026-07-30T17:41:18.7643963Z Prepare all required actions
+2026-07-30T17:41:18.7692015Z Getting action download info
+2026-07-30T17:41:19.1209883Z Download action repository 'actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c' (SHA:3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c)
+2026-07-30T17:41:19.4961738Z Complete job name: lint-frontend
+2026-07-30T17:41:19.5712932Z ##[group]Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+2026-07-30T17:41:19.5714071Z with:
+2026-07-30T17:41:19.5714715Z   name: docker-image
+2026-07-30T17:41:19.5715236Z   merge-multiple: false
+2026-07-30T17:41:19.5715732Z   repository: apache/superset
+2026-07-30T17:41:19.5716236Z   run-id: 30566436064
+2026-07-30T17:41:19.5716696Z   skip-decompress: false
+2026-07-30T17:41:19.5717184Z   digest-mismatch: error
+2026-07-30T17:41:19.5717879Z env:
+2026-07-30T17:41:19.5718316Z   TAG: apache/superset:GHA-30566436064
+2026-07-30T17:41:19.5718854Z ##[endgroup]
+2026-07-30T17:41:19.7271847Z Downloading single artifact
+2026-07-30T17:41:19.9836418Z Preparing to download the following artifacts:
+2026-07-30T17:41:19.9838557Z - docker-image (ID: 8769243509, Size: 676326221, Expected Digest: sha256:6289df4cbe32cf3a2ed4073017eb47b0aa91904cf5337f13ab982d6ae15a7b30)
+2026-07-30T17:41:20.4896599Z Redirecting to blob download url: https://productionresultssa2.blob.core.windows.net/actions-results/2bd23189-7339-49a3-8e4c-d17175e3d14a/workflow-job-run-b91e8ebe-7276-53f1-bf42-2ae40d21722c/artifacts/d00d9db8955031cc609b4ecce7ceac843ed503a5f4fa84e72344ea36548494c6.zip
+2026-07-30T17:41:20.4901034Z Starting download of artifact to: /home/runner/work/superset/superset
+2026-07-30T17:41:20.8104334Z (node:2258) [DEP0005] DeprecationWarning: Buffer() is deprecated due to security and usability issues. Please use the Buffer.alloc(), Buffer.allocUnsafe(), or Buffer.from() methods instead.
+2026-07-30T17:41:20.8109090Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-07-30T17:41:44.9860895Z SHA256 digest of downloaded artifact is 6289df4cbe32cf3a2ed4073017eb47b0aa91904cf5337f13ab982d6ae15a7b30
+2026-07-30T17:41:44.9862129Z Artifact download completed successfully.
+2026-07-30T17:41:44.9862763Z Total of 1 artifact(s) downloaded
+2026-07-30T17:41:44.9866226Z Download artifact has finished successfully
+2026-07-30T17:41:45.0080557Z ##[group]Run zstd -d < docker-image.tar.zst | docker load
+2026-07-30T17:41:45.0081141Z [36;1mzstd -d < docker-image.tar.zst | docker load[0m
+2026-07-30T17:41:45.0321233Z shell: /usr/bin/bash -e {0}
+2026-07-30T17:41:45.0321639Z env:
+2026-07-30T17:41:45.0321924Z   TAG: apache/superset:GHA-30566436064
+2026-07-30T17:41:45.0322578Z ##[endgroup]
+2026-07-30T17:42:21.1587630Z Loaded image: apache/superset:GHA-30566436064
+2026-07-30T17:42:21.1769009Z ##[group]Run docker run --rm $TAG bash -c \
+2026-07-30T17:42:21.1769464Z [36;1mdocker run --rm $TAG bash -c \[0m
+2026-07-30T17:42:21.1769803Z [36;1m"npm i && npm run lint"[0m
+2026-07-30T17:42:21.1820716Z shell: /usr/bin/bash -e {0}
+2026-07-30T17:42:21.1821033Z env:
+2026-07-30T17:42:21.1821453Z   TAG: apache/superset:GHA-30566436064
+2026-07-30T17:42:21.1821781Z ##[endgroup]
+2026-07-30T17:42:33.2861958Z 
+2026-07-30T17:42:33.2862690Z added 109 packages, and audited 3145 packages in 10s
+2026-07-30T17:42:33.2863216Z 
+2026-07-30T17:42:33.2864022Z 604 packages are looking for funding
+2026-07-30T17:42:33.2870369Z   run `npm fund` for details
+2026-07-30T17:42:33.3691168Z 
+2026-07-30T17:42:33.3691748Z 40 high severity vulnerabilities
+2026-07-30T17:42:33.3692246Z 
+2026-07-30T17:42:33.3692768Z To address issues that do not require attention, run:
+2026-07-30T17:42:33.3693454Z   npm audit fix
+2026-07-30T17:42:33.3693730Z 
+2026-07-30T17:42:33.3694148Z To address all issues possible (including breaking changes), run:
+2026-07-30T17:42:33.3695162Z   npm audit fix --force
+2026-07-30T17:42:33.3695527Z 
+2026-07-30T17:42:33.3695782Z Some issues need review, and may require choosing
+2026-07-30T17:42:33.3696362Z a different dependency.
+2026-07-30T17:42:33.3696632Z 
+2026-07-30T17:42:33.3696811Z Run `npm audit` for details.
+2026-07-30T17:42:33.3709894Z npm warn allow-scripts 7 packages have install scripts not yet covered by allowScripts:
+2026-07-30T17:42:33.3711058Z npm warn allow-scripts   @scarf/scarf@1.4.0 (install: (install scripts present))
+2026-07-30T17:42:33.3712146Z npm warn allow-scripts   @swc/core@1.15.46 (install: (install scripts present))
+2026-07-30T17:42:33.3713150Z npm warn allow-scripts   core-js@3.49.0 (install: (install scripts present))
+2026-07-30T17:42:33.3714184Z npm warn allow-scripts   core-js-pure@3.48.0 (install: (install scripts present))
+2026-07-30T17:42:33.3715490Z npm warn allow-scripts   esbuild@0.28.1 (install: (install scripts present))
+2026-07-30T17:42:33.3716474Z npm warn allow-scripts   nx@22.6.1 (install: (install scripts present))
+2026-07-30T17:42:33.3717452Z npm warn allow-scripts   unrs-resolver@1.9.2 (install: (install scripts present))
+2026-07-30T17:42:33.3718262Z npm warn allow-scripts
+2026-07-30T17:42:33.3727715Z npm warn allow-scripts Run `npm approve-scripts --allow-scripts-pending` to review, or `npm approve-scripts <pkg>` to allow.
+2026-07-30T17:42:33.3728813Z npm notice
+2026-07-30T17:42:33.3729783Z npm notice New major version of npm available! 11.16.0 -> 12.0.2
+2026-07-30T17:42:33.3730882Z npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2
+2026-07-30T17:42:33.3732050Z npm notice To update run: npm install -g npm@12.0.2
+2026-07-30T17:42:33.3732970Z npm notice
+2026-07-30T17:42:33.5119507Z 
+2026-07-30T17:42:33.5120283Z > superset@0.0.0-dev lint
+2026-07-30T17:42:33.5120705Z > npx oxlint --config oxlint.json --quiet
+2026-07-30T17:42:33.5121002Z 
+2026-07-30T17:42:35.8868073Z 
+2026-07-30T17:42:35.8868633Z Found 1453 warnings and 0 errors.
+2026-07-30T17:42:36.2628032Z Finished in 2.1s on 3724 files with 225 rules using 4 threads.
+2026-07-30T17:42:36.2660264Z ##[group]Run docker run --rm $TAG bash -c \
+2026-07-30T17:42:36.2660655Z [36;1mdocker run --rm $TAG bash -c \[0m
+2026-07-30T17:42:36.2660997Z [36;1m"npm i && npm run plugins:build && npm run type"[0m
+2026-07-30T17:42:36.2707964Z shell: /usr/bin/bash -e {0}
+2026-07-30T17:42:36.2708227Z env:
+2026-07-30T17:42:36.2708435Z   TAG: apache/superset:GHA-30566436064
+2026-07-30T17:42:36.2708705Z ##[endgroup]
+2026-07-30T17:42:46.2427376Z 
+2026-07-30T17:42:46.2428373Z added 109 packages, and audited 3145 packages in 10s
+2026-07-30T17:42:46.2429204Z 
+2026-07-30T17:42:46.2429908Z 604 packages are looking for funding
+2026-07-30T17:42:46.2455289Z   run `npm fund` for details
+2026-07-30T17:42:46.3247222Z 
+2026-07-30T17:42:46.3247762Z 40 high severity vulnerabilities
+2026-07-30T17:42:46.3248634Z 
+2026-07-30T17:42:46.3248841Z To address issues that do not require attention, run:
+2026-07-30T17:42:46.3249312Z   npm audit fix
+2026-07-30T17:42:46.3249478Z 
+2026-07-30T17:42:46.3249775Z To address all issues possible (including breaking changes), run:
+2026-07-30T17:42:46.3250248Z   npm audit fix --force
+2026-07-30T17:42:46.3250438Z 
+2026-07-30T17:42:46.3250595Z Some issues need review, and may require choosing
+2026-07-30T17:42:46.3251040Z a different dependency.
+2026-07-30T17:42:46.3251234Z 
+2026-07-30T17:42:46.3251349Z Run `npm audit` for details.
+2026-07-30T17:42:46.3264873Z npm warn allow-scripts 7 packages have install scripts not yet covered by allowScripts:
+2026-07-30T17:42:46.3265652Z npm warn allow-scripts   @scarf/scarf@1.4.0 (install: (install scripts present))
+2026-07-30T17:42:46.3266404Z npm warn allow-scripts   @swc/core@1.15.46 (install: (install scripts present))
+2026-07-30T17:42:46.3267031Z npm warn allow-scripts   core-js@3.49.0 (install: (install scripts present))
+2026-07-30T17:42:46.3267703Z npm warn allow-scripts   core-js-pure@3.48.0 (install: (install scripts present))
+2026-07-30T17:42:46.3268333Z npm warn allow-scripts   esbuild@0.28.1 (install: (install scripts present))
+2026-07-30T17:42:46.3268922Z npm warn allow-scripts   nx@22.6.1 (install: (install scripts present))
+2026-07-30T17:42:46.3269520Z npm warn allow-scripts   unrs-resolver@1.9.2 (install: (install scripts present))
+2026-07-30T17:42:46.3270037Z npm warn allow-scripts
+2026-07-30T17:42:46.3270678Z npm warn allow-scripts Run `npm approve-scripts --allow-scripts-pending` to review, or `npm approve-scripts <pkg>` to allow.
+2026-07-30T17:42:46.3280819Z npm notice
+2026-07-30T17:42:46.3281374Z npm notice New major version of npm available! 11.16.0 -> 12.0.2
+2026-07-30T17:42:46.3281990Z npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2
+2026-07-30T17:42:46.3282444Z npm notice To update run: npm install -g npm@12.0.2
+2026-07-30T17:42:46.3282759Z npm notice
+2026-07-30T17:42:46.4605651Z 
+2026-07-30T17:42:46.4606605Z > superset@0.0.0-dev plugins:build
+2026-07-30T17:42:46.4607186Z > node ./scripts/build.js
+2026-07-30T17:42:46.4607465Z 
+2026-07-30T17:42:46.5611391Z --- Run babel --------
+2026-07-30T17:42:46.5613686Z 
+2026-07-30T17:42:46.5614555Z >> lerna exec --stream --concurrency 10 --scope {@superset-ui/!(demo|generator-superset),@apache-superset/*}
+2026-07-30T17:42:46.5616109Z         -- babel --config-file=../../babel.config.js src --extensions ".ts,.tsx,.js,.jsx" --copy-files --out-dir lib
+2026-07-30T17:42:46.5616987Z 
+2026-07-30T17:42:47.2976870Z lerna notice cli v9.0.7
+2026-07-30T17:42:47.5726834Z lerna notice filter including "{@superset-ui/!(demo|generator-superset),@apache-superset/*}\n"
+2026-07-30T17:42:47.5749372Z lerna info filter [ '{@superset-ui/!(demo|generator-superset),@apache-superset/*}\n' ]
+2026-07-30T17:42:47.5752622Z lerna info Executing command in 23 packages: "babel       --config-file=../../babel.config.js src --extensions \".ts,.tsx,.js,.jsx\" --copy-files --out-dir lib"
+2026-07-30T17:42:47.6758155Z (node:39) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+2026-07-30T17:42:47.6760691Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-07-30T17:42:49.1113984Z @superset-ui/legacy-plugin-chart-chord: Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+2026-07-30T17:42:49.1115833Z @superset-ui/legacy-plugin-chart-chord:   npx update-browserslist-db@latest
+2026-07-30T17:42:49.1117272Z @superset-ui/legacy-plugin-chart-chord:   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2026-07-30T17:42:49.1312028Z @superset-ui/legacy-plugin-chart-calendar: Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+2026-07-30T17:42:49.1313341Z @superset-ui/legacy-plugin-chart-calendar:   npx update-browserslist-db@latest
+2026-07-30T17:42:49.1314871Z @superset-ui/legacy-plugin-chart-calendar:   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2026-07-30T17:42:49.2171426Z @superset-ui/switchboard: Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+2026-07-30T17:42:49.2172839Z @superset-ui/switchboard:   npx update-browserslist-db@latest
+2026-07-30T17:42:49.2174244Z @superset-ui/switchboard:   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2026-07-30T17:42:49.2283198Z @superset-ui/legacy-plugin-chart-horizon: Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+2026-07-30T17:42:49.2285358Z @superset-ui/legacy-plugin-chart-horizon:   npx update-browserslist-db@latest
+2026-07-30T17:42:49.2286767Z @superset-ui/legacy-plugin-chart-horizon:   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2026-07-30T17:42:49.2470866Z @superset-ui/legacy-plugin-chart-parallel-coordinates: Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+2026-07-30T17:42:49.2472680Z @superset-ui/legacy-plugin-chart-parallel-coordinates:   npx update-browserslist-db@latest
+2026-07-30T17:42:49.2475815Z @superset-ui/legacy-plugin-chart-parallel-coordinates:   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2026-07-30T17:42:49.2753414Z @superset-ui/legacy-plugin-chart-paired-t-test: Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+2026-07-30T17:42:49.2755397Z @superset-ui/legacy-plugin-chart-paired-t-test:   npx update-browserslist-db@latest
+2026-07-30T17:42:49.2757182Z @superset-ui/legacy-plugin-chart-paired-t-test:   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2026-07-30T17:42:49.2758989Z @apache-superset/core: Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+2026-07-30T17:42:49.2760352Z @apache-superset/core:   npx update-browserslist-db@latest
+2026-07-30T17:42:49.2761707Z @apache-superset/core:   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2026-07-30T17:42:49.3512819Z @superset-ui/legacy-plugin-chart-rose: Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+2026-07-30T17:42:49.3514332Z @superset-ui/legacy-plugin-chart-rose:   npx update-browserslist-db@latest
+2026-07-30T17:42:49.3516348Z @superset-ui/legacy-plugin-chart-rose:   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2026-07-30T17:42:49.3570466Z @superset-ui/legacy-plugin-chart-partition: Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+2026-07-30T17:42:49.3572106Z @superset-ui/legacy-plugin-chart-partition:   npx update-browserslist-db@latest
+2026-07-30T17:42:49.3573739Z @superset-ui/legacy-plugin-chart-partition:   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2026-07-30T17:42:49.4362461Z @superset-ui/legacy-plugin-chart-country-map: Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+2026-07-30T17:42:49.4364319Z @superset-ui/legacy-plugin-chart-country-map:   npx update-browserslist-db@latest
+2026-07-30T17:42:49.4366415Z @superset-ui/legacy-plugin-chart-country-map:   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2026-07-30T17:42:50.0026156Z @superset-ui/legacy-plugin-chart-chord: Successfully compiled 7 files with Babel (1989ms).
+2026-07-30T17:42:50.0279011Z @superset-ui/switchboard: Successfully compiled 3 files with Babel (1901ms).
+2026-07-30T17:42:50.2600451Z @superset-ui/legacy-plugin-chart-horizon: Successfully compiled 7 files with Babel (2139ms).
+2026-07-30T17:42:50.3830174Z @superset-ui/legacy-plugin-chart-rose: Successfully compiled 7 files with Babel (2127ms).
+2026-07-30T17:42:50.4540275Z @superset-ui/legacy-plugin-chart-paired-t-test: Successfully compiled 7 files with Babel (2247ms).
+2026-07-30T17:42:50.6479526Z @superset-ui/legacy-plugin-chart-partition: Successfully compiled 8 files with Babel (2398ms).
+2026-07-30T17:42:51.4585046Z @superset-ui/legacy-plugin-chart-country-map: Successfully compiled 8 files with Babel (3346ms).
+2026-07-30T17:42:51.4699849Z @superset-ui/legacy-plugin-chart-calendar: Successfully compiled 9 files with Babel (3465ms).
+2026-07-30T17:42:51.5750713Z @superset-ui/legacy-plugin-chart-parallel-coordinates: Successfully compiled 9 files with Babel (3446ms).
+2026-07-30T17:42:51.6450639Z @superset-ui/plugin-chart-ag-grid-table: Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+2026-07-30T17:42:51.6451895Z @superset-ui/plugin-chart-ag-grid-table:   npx update-browserslist-db@latest
+2026-07-30T17:42:51.6453162Z @superset-ui/plugin-chart-ag-grid-table:   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2026-07-30T17:42:51.9090475Z @superset-ui/legacy-plugin-chart-world-map: Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+2026-07-30T17:42:51.9092182Z @superset-ui/legacy-plugin-chart-world-map:   npx update-browserslist-db@latest
+2026-07-30T17:42:51.9093898Z @superset-ui/legacy-plugin-chart-world-map:   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2026-07-30T17:42:52.1372120Z @superset-ui/legacy-preset-chart-nvd3: Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+2026-07-30T17:42:52.1373972Z @superset-ui/legacy-preset-chart-nvd3:   npx update-browserslist-db@latest
+2026-07-30T17:42:52.1381329Z @superset-ui/legacy-preset-chart-nvd3:   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2026-07-30T17:42:52.1497078Z @apache-superset/core: Successfully compiled 40 files with Babel (4113ms).
+2026-07-30T17:42:52.2006577Z @superset-ui/plugin-chart-cartodiagram: Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+2026-07-30T17:42:52.2008458Z @superset-ui/plugin-chart-cartodiagram:   npx update-browserslist-db@latest
+2026-07-30T17:42:52.2009928Z @superset-ui/plugin-chart-cartodiagram:   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2026-07-30T17:42:52.6200730Z @superset-ui/plugin-chart-handlebars: Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+2026-07-30T17:42:52.6202657Z @superset-ui/plugin-chart-handlebars:   npx update-browserslist-db@latest
+2026-07-30T17:42:52.6204095Z @superset-ui/plugin-chart-handlebars:   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2026-07-30T17:42:52.7300266Z @superset-ui/plugin-chart-echarts: Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+2026-07-30T17:42:52.7302081Z @superset-ui/plugin-chart-echarts:   npx update-browserslist-db@latest
+2026-07-30T17:42:52.7303472Z @superset-ui/plugin-chart-echarts:   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2026-07-30T17:42:52.9108558Z @superset-ui/legacy-plugin-chart-world-map: Successfully compiled 8 files with Babel (1859ms).
+2026-07-30T17:42:53.2392866Z @superset-ui/plugin-chart-point-cluster-map: Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+2026-07-30T17:42:53.2395278Z @superset-ui/plugin-chart-point-cluster-map:   npx update-browserslist-db@latest
+2026-07-30T17:42:53.2397113Z @superset-ui/plugin-chart-point-cluster-map:   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2026-07-30T17:42:53.3068803Z @superset-ui/plugin-chart-table: Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+2026-07-30T17:42:53.3077306Z @superset-ui/plugin-chart-table:   npx update-browserslist-db@latest
+2026-07-30T17:42:53.3085269Z @superset-ui/plugin-chart-table:   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2026-07-30T17:42:53.6960330Z @superset-ui/plugin-chart-pivot-table: Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+2026-07-30T17:42:53.6967822Z @superset-ui/plugin-chart-pivot-table:   npx update-browserslist-db@latest
+2026-07-30T17:42:53.6969534Z @superset-ui/plugin-chart-pivot-table:   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2026-07-30T17:42:53.9375738Z @superset-ui/plugin-chart-cartodiagram: Successfully compiled 21 files with Babel (2535ms).
+2026-07-30T17:42:54.2357804Z @superset-ui/plugin-chart-handlebars: Successfully compiled 23 files with Babel (2671ms).
+2026-07-30T17:42:54.2735889Z @superset-ui/legacy-preset-chart-nvd3: Successfully compiled 27 files with Babel (3326ms).
+2026-07-30T17:42:54.5526778Z @superset-ui/plugin-chart-word-cloud: Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+2026-07-30T17:42:54.5528046Z @superset-ui/plugin-chart-word-cloud:   npx update-browserslist-db@latest
+2026-07-30T17:42:54.5529257Z @superset-ui/plugin-chart-word-cloud:   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2026-07-30T17:42:54.9020965Z @superset-ui/plugin-chart-ag-grid-table: Successfully compiled 45 files with Babel (3804ms).
+2026-07-30T17:42:55.0608921Z @superset-ui/plugin-chart-point-cluster-map: Successfully compiled 14 files with Babel (2649ms).
+2026-07-30T17:42:55.0610403Z @superset-ui/preset-chart-deckgl: Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+2026-07-30T17:42:55.0611500Z @superset-ui/preset-chart-deckgl:   npx update-browserslist-db@latest
+2026-07-30T17:42:55.0612676Z @superset-ui/preset-chart-deckgl:   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2026-07-30T17:42:55.6143483Z @superset-ui/plugin-chart-table: Successfully compiled 28 files with Babel (3123ms).
+2026-07-30T17:42:55.8266235Z @superset-ui/core: Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+2026-07-30T17:42:55.8267213Z @superset-ui/core:   npx update-browserslist-db@latest
+2026-07-30T17:42:55.8268195Z @superset-ui/core:   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2026-07-30T17:42:55.8426030Z @superset-ui/plugin-chart-word-cloud: Successfully compiled 14 files with Babel (2630ms).
+2026-07-30T17:42:55.8620560Z @superset-ui/chart-controls: Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+2026-07-30T17:42:55.8621830Z @superset-ui/chart-controls:   npx update-browserslist-db@latest
+2026-07-30T17:42:55.8622934Z @superset-ui/chart-controls:   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2026-07-30T17:42:56.0029510Z @superset-ui/plugin-chart-pivot-table: Successfully compiled 15 files with Babel (3502ms).
+2026-07-30T17:42:57.5646209Z @superset-ui/chart-controls: Successfully compiled 75 files with Babel (2859ms).
+2026-07-30T17:42:58.5746074Z @superset-ui/preset-chart-deckgl: Successfully compiled 135 files with Babel (4916ms).
+2026-07-30T17:42:58.8836314Z @superset-ui/plugin-chart-echarts: Successfully compiled 220 files with Babel (7386ms).
+2026-07-30T17:43:00.9016668Z @superset-ui/core: Successfully compiled 644 files with Babel (5916ms).
+2026-07-30T17:43:00.9412586Z lerna success exec Executed command in 23 packages: "babel       --config-file=../../babel.config.js src --extensions \".ts,.tsx,.js,.jsx\" --copy-files --out-dir lib"
+2026-07-30T17:43:00.9635233Z --- Run babel esm ---
+2026-07-30T17:43:00.9635768Z 
+2026-07-30T17:43:00.9636413Z >> lerna exec --stream --concurrency 10 --scope {@superset-ui/!(demo|generator-superset),@apache-superset/*}
+2026-07-30T17:43:00.9637622Z         -- babel --config-file=../../babel.config.js src --extensions ".ts,.tsx,.js,.jsx" --copy-files --out-dir esm
+2026-07-30T17:43:00.9638080Z 
+2026-07-30T17:43:01.6557373Z lerna notice cli v9.0.7
+2026-07-30T17:43:01.7938046Z lerna notice filter including "{@superset-ui/!(demo|generator-superset),@apache-superset/*}\n"
+2026-07-30T17:43:01.7962020Z lerna info filter [ '{@superset-ui/!(demo|generator-superset),@apache-superset/*}\n' ]
+2026-07-30T17:43:01.7964870Z lerna info Executing command in 23 packages: "babel       --config-file=../../babel.config.js src --extensions \".ts,.tsx,.js,.jsx\" --copy-files --out-dir esm"
+2026-07-30T17:43:01.8679153Z (node:341) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+2026-07-30T17:43:01.8683358Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-07-30T17:43:03.0167948Z @superset-ui/legacy-plugin-chart-chord: Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+2026-07-30T17:43:03.0169267Z @superset-ui/legacy-plugin-chart-chord:   npx update-browserslist-db@latest
+2026-07-30T17:43:03.0170582Z @superset-ui/legacy-plugin-chart-chord:   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2026-07-30T17:43:03.0367422Z @superset-ui/legacy-plugin-chart-country-map: Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+2026-07-30T17:43:03.0371765Z @superset-ui/legacy-plugin-chart-country-map:   npx update-browserslist-db@latest
+2026-07-30T17:43:03.0373601Z @superset-ui/legacy-plugin-chart-country-map:   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2026-07-30T17:43:03.0735500Z @superset-ui/legacy-plugin-chart-partition: Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+2026-07-30T17:43:03.0737183Z @superset-ui/legacy-plugin-chart-partition:   npx update-browserslist-db@latest
+2026-07-30T17:43:03.0738823Z @superset-ui/legacy-plugin-chart-partition:   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2026-07-30T17:43:03.1126881Z @superset-ui/legacy-plugin-chart-parallel-coordinates: Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+2026-07-30T17:43:03.1131775Z @superset-ui/legacy-plugin-chart-parallel-coordinates:   npx update-browserslist-db@latest
+2026-07-30T17:43:03.1134062Z @superset-ui/legacy-plugin-chart-parallel-coordinates:   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2026-07-30T17:43:03.1390177Z @superset-ui/legacy-plugin-chart-paired-t-test: Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+2026-07-30T17:43:03.1392138Z @superset-ui/legacy-plugin-chart-paired-t-test:   npx update-browserslist-db@latest
+2026-07-30T17:43:03.1394109Z @superset-ui/legacy-plugin-chart-paired-t-test:   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2026-07-30T17:43:03.1788232Z @superset-ui/switchboard: Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+2026-07-30T17:43:03.1789546Z @superset-ui/switchboard:   npx update-browserslist-db@latest
+2026-07-30T17:43:03.1790575Z @superset-ui/switchboard:   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2026-07-30T17:43:03.2129216Z @superset-ui/legacy-plugin-chart-horizon: Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+2026-07-30T17:43:03.2130559Z @superset-ui/legacy-plugin-chart-horizon:   npx update-browserslist-db@latest
+2026-07-30T17:43:03.2131907Z @superset-ui/legacy-plugin-chart-horizon:   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2026-07-30T17:43:03.2398590Z @apache-superset/core: Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+2026-07-30T17:43:03.2399708Z @apache-superset/core:   npx update-browserslist-db@latest
+2026-07-30T17:43:03.2401145Z @apache-superset/core:   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2026-07-30T17:43:03.3923575Z @superset-ui/legacy-plugin-chart-calendar: Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+2026-07-30T17:43:03.3925390Z @superset-ui/legacy-plugin-chart-calendar:   npx update-browserslist-db@latest
+2026-07-30T17:43:03.3927071Z @superset-ui/legacy-plugin-chart-calendar:   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2026-07-30T17:43:03.5810875Z @superset-ui/legacy-plugin-chart-chord: Successfully compiled 7 files with Babel (1396ms).
+2026-07-30T17:43:03.6498956Z @superset-ui/legacy-plugin-chart-rose: Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+2026-07-30T17:43:03.6500942Z @superset-ui/legacy-plugin-chart-rose:   npx update-browserslist-db@latest
+2026-07-30T17:43:03.6503411Z @superset-ui/legacy-plugin-chart-rose:   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2026-07-30T17:43:04.0792255Z @superset-ui/switchboard: Successfully compiled 3 files with Babel (1911ms).
+2026-07-30T17:43:04.1168377Z @superset-ui/legacy-plugin-chart-partition: Successfully compiled 8 files with Babel (1787ms).
+2026-07-30T17:43:04.1512953Z @superset-ui/legacy-plugin-chart-paired-t-test: Successfully compiled 7 files with Babel (1961ms).
+2026-07-30T17:43:04.1756635Z @superset-ui/legacy-plugin-chart-horizon: Successfully compiled 7 files with Babel (2012ms).
+2026-07-30T17:43:04.4508991Z @superset-ui/legacy-plugin-chart-country-map: Successfully compiled 8 files with Babel (2235ms).
+2026-07-30T17:43:04.8589388Z @superset-ui/legacy-plugin-chart-parallel-coordinates: Successfully compiled 9 files with Babel (2511ms).
+2026-07-30T17:43:04.9672314Z @superset-ui/legacy-plugin-chart-world-map: Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+2026-07-30T17:43:04.9675105Z @superset-ui/legacy-plugin-chart-world-map:   npx update-browserslist-db@latest
+2026-07-30T17:43:04.9676843Z @superset-ui/legacy-plugin-chart-world-map:   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2026-07-30T17:43:05.3044309Z @superset-ui/legacy-plugin-chart-rose: Successfully compiled 7 files with Babel (2905ms).
+2026-07-30T17:43:05.5798376Z @superset-ui/plugin-chart-cartodiagram: Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+2026-07-30T17:43:05.5800548Z @superset-ui/plugin-chart-cartodiagram:   npx update-browserslist-db@latest
+2026-07-30T17:43:05.5802554Z @superset-ui/plugin-chart-cartodiagram:   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2026-07-30T17:43:05.7145497Z @superset-ui/plugin-chart-handlebars: Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+2026-07-30T17:43:05.7147842Z @superset-ui/plugin-chart-handlebars:   npx update-browserslist-db@latest
+2026-07-30T17:43:05.7149586Z @superset-ui/plugin-chart-handlebars:   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2026-07-30T17:43:05.7601263Z @superset-ui/legacy-plugin-chart-world-map: Successfully compiled 8 files with Babel (1712ms).
+2026-07-30T17:43:06.0011331Z @superset-ui/plugin-chart-ag-grid-table: Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+2026-07-30T17:43:06.0019781Z @superset-ui/plugin-chart-ag-grid-table:   npx update-browserslist-db@latest
+2026-07-30T17:43:06.0022172Z @superset-ui/plugin-chart-ag-grid-table:   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2026-07-30T17:43:06.0024073Z @superset-ui/plugin-chart-pivot-table: Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+2026-07-30T17:43:06.0025963Z @superset-ui/plugin-chart-pivot-table:   npx update-browserslist-db@latest
+2026-07-30T17:43:06.0027548Z @superset-ui/plugin-chart-pivot-table:   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2026-07-30T17:43:06.0109349Z @superset-ui/legacy-plugin-chart-calendar: Successfully compiled 9 files with Babel (3729ms).
+2026-07-30T17:43:06.1232818Z @superset-ui/legacy-preset-chart-nvd3: Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+2026-07-30T17:43:06.1234325Z @superset-ui/legacy-preset-chart-nvd3:   npx update-browserslist-db@latest
+2026-07-30T17:43:06.1242999Z @superset-ui/legacy-preset-chart-nvd3:   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2026-07-30T17:43:06.2877380Z @superset-ui/plugin-chart-echarts: Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+2026-07-30T17:43:06.2879138Z @superset-ui/plugin-chart-echarts:   npx update-browserslist-db@latest
+2026-07-30T17:43:06.2880595Z @superset-ui/plugin-chart-echarts:   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2026-07-30T17:43:06.7422062Z @apache-superset/core: Successfully compiled 40 files with Babel (4572ms).
+2026-07-30T17:43:06.9186887Z @superset-ui/plugin-chart-handlebars: Successfully compiled 23 files with Babel (2010ms).
+2026-07-30T17:43:06.9582280Z @superset-ui/plugin-chart-cartodiagram: Successfully compiled 21 files with Babel (2295ms).
+2026-07-30T17:43:06.9695364Z @superset-ui/plugin-chart-point-cluster-map: Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+2026-07-30T17:43:06.9704221Z @superset-ui/plugin-chart-point-cluster-map:   npx update-browserslist-db@latest
+2026-07-30T17:43:06.9712850Z @superset-ui/plugin-chart-point-cluster-map:   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2026-07-30T17:43:07.6568334Z @superset-ui/plugin-chart-table: Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+2026-07-30T17:43:07.6570195Z @superset-ui/plugin-chart-table:   npx update-browserslist-db@latest
+2026-07-30T17:43:07.6577149Z @superset-ui/plugin-chart-table:   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2026-07-30T17:43:07.7308539Z @superset-ui/plugin-chart-word-cloud: Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+2026-07-30T17:43:07.7310518Z @superset-ui/plugin-chart-word-cloud:   npx update-browserslist-db@latest
+2026-07-30T17:43:07.7312191Z @superset-ui/plugin-chart-word-cloud:   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2026-07-30T17:43:08.5146523Z @superset-ui/plugin-chart-pivot-table: Successfully compiled 15 files with Babel (3163ms).
+2026-07-30T17:43:08.5982893Z @superset-ui/legacy-preset-chart-nvd3: Successfully compiled 27 files with Babel (3782ms).
+2026-07-30T17:43:08.7782982Z @superset-ui/chart-controls: Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+2026-07-30T17:43:08.7784786Z @superset-ui/chart-controls:   npx update-browserslist-db@latest
+2026-07-30T17:43:08.7786210Z @superset-ui/chart-controls:   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2026-07-30T17:43:08.8111223Z @superset-ui/preset-chart-deckgl: Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+2026-07-30T17:43:08.8112870Z @superset-ui/preset-chart-deckgl:   npx update-browserslist-db@latest
+2026-07-30T17:43:08.8114325Z @superset-ui/preset-chart-deckgl:   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2026-07-30T17:43:08.8617204Z @superset-ui/plugin-chart-word-cloud: Successfully compiled 14 files with Babel (2175ms).
+2026-07-30T17:43:08.9636644Z @superset-ui/core: Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+2026-07-30T17:43:08.9637944Z @superset-ui/core:   npx update-browserslist-db@latest
+2026-07-30T17:43:08.9639264Z @superset-ui/core:   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2026-07-30T17:43:09.1580497Z @superset-ui/plugin-chart-point-cluster-map: Successfully compiled 14 files with Babel (3143ms).
+2026-07-30T17:43:09.7974809Z @superset-ui/plugin-chart-ag-grid-table: Successfully compiled 45 files with Babel (4998ms).
+2026-07-30T17:43:10.3743256Z @superset-ui/plugin-chart-table: Successfully compiled 28 files with Babel (3894ms).
+2026-07-30T17:43:10.9386490Z @superset-ui/chart-controls: Successfully compiled 75 files with Babel (3453ms).
+2026-07-30T17:43:12.0726340Z @superset-ui/preset-chart-deckgl: Successfully compiled 135 files with Babel (4721ms).
+2026-07-30T17:43:12.3899768Z @superset-ui/plugin-chart-echarts: Successfully compiled 220 files with Babel (7467ms).
+2026-07-30T17:43:14.5166041Z @superset-ui/core: Successfully compiled 644 files with Babel (6880ms).
+2026-07-30T17:43:14.5568745Z lerna success exec Executed command in 23 packages: "babel       --config-file=../../babel.config.js src --extensions \".ts,.tsx,.js,.jsx\" --copy-files --out-dir esm"
+2026-07-30T17:43:14.5779669Z --- Run tsc ---
+2026-07-30T17:43:14.6078158Z 
+2026-07-30T17:43:14.6086322Z >> lerna exec --stream --concurrency 3 --scope {@superset-ui/{chart-controls,core,legacy-plugin-chart-calendar,legacy-plugin-chart-chord,legacy-plugin-chart-country-map,legacy-plugin-chart-horizon,legacy-plugin-chart-paired-t-test,legacy-plugin-chart-parallel-coordinates,legacy-plugin-chart-partition,legacy-plugin-chart-rose,legacy-plugin-chart-world-map,legacy-preset-chart-nvd3,plugin-chart-ag-grid-table,plugin-chart-cartodiagram,plugin-chart-echarts,plugin-chart-handlebars,plugin-chart-pivot-table,plugin-chart-point-cluster-map,plugin-chart-table,plugin-chart-word-cloud,preset-chart-deckgl,switchboard},@apache-superset/core}       -- ../../scripts/tsc.sh --build
+2026-07-30T17:43:14.6093622Z 
+2026-07-30T17:43:15.2903189Z lerna notice cli v9.0.7
+2026-07-30T17:43:15.4306678Z lerna notice filter including "{@superset-ui/{chart-controls,core,legacy-plugin-chart-calendar,legacy-plugin-chart-chord,legacy-plugin-chart-country-map,legacy-plugin-chart-horizon,legacy-plugin-chart-paired-t-test,legacy-plugin-chart-parallel-coordinates,legacy-plugin-chart-partition,legacy-plugin-chart-rose,legacy-plugin-chart-world-map,legacy-preset-chart-nvd3,plugin-chart-ag-grid-table,plugin-chart-cartodiagram,plugin-chart-echarts,plugin-chart-handlebars,plugin-chart-pivot-table,plugin-chart-point-cluster-map,plugin-chart-table,plugin-chart-word-cloud,preset-chart-deckgl,switchboard},@apache-superset/core}"
+2026-07-30T17:43:15.4354192Z lerna info filter [
+2026-07-30T17:43:15.4362202Z lerna info filter   '{@superset-ui/{chart-controls,core,legacy-plugin-chart-calendar,legacy-plugin-chart-chord,legacy-plugin-chart-country-map,legacy-plugin-chart-horizon,legacy-plugin-chart-paired-t-test,legacy-plugin-chart-parallel-coordinates,legacy-plugin-chart-partition,legacy-plugin-chart-rose,legacy-plugin-chart-world-map,legacy-preset-chart-nvd3,plugin-chart-ag-grid-table,plugin-chart-cartodiagram,plugin-chart-echarts,plugin-chart-handlebars,plugin-chart-pivot-table,plugin-chart-point-cluster-map,plugin-chart-table,plugin-chart-word-cloud,preset-chart-deckgl,switchboard},@apache-superset/core}'
+2026-07-30T17:43:15.4367394Z lerna info filter ]
+2026-07-30T17:43:15.4367752Z lerna info Executing command in 23 packages: "../../scripts/tsc.sh      --build"
+2026-07-30T17:43:15.4556628Z (node:643) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+2026-07-30T17:43:15.4565482Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-07-30T17:43:18.1206280Z @superset-ui/switchboard: compiled in 2.629s
+2026-07-30T17:43:19.6486298Z @apache-superset/core: compiled in 4.165s
+2026-07-30T17:43:36.2797265Z @superset-ui/legacy-plugin-chart-calendar: compiled in 20.793s
+2026-07-30T17:43:38.9630516Z @superset-ui/legacy-plugin-chart-country-map: compiled in 19.204s
+2026-07-30T17:43:39.1972921Z @superset-ui/legacy-plugin-chart-chord: compiled in 21.019s
+2026-07-30T17:43:41.3018226Z @superset-ui/legacy-plugin-chart-horizon: compiled in 4.937s
+2026-07-30T17:43:44.2896581Z @superset-ui/legacy-plugin-chart-paired-t-test: compiled in 5.272s
+2026-07-30T17:43:44.7449390Z @superset-ui/legacy-plugin-chart-parallel-coordinates: compiled in 5.51s
+2026-07-30T17:43:46.9763113Z @superset-ui/legacy-plugin-chart-partition: compiled in 5.618s
+2026-07-30T17:43:49.8679794Z @superset-ui/legacy-plugin-chart-rose: compiled in 5.526s
+2026-07-30T17:43:50.0938811Z @superset-ui/legacy-plugin-chart-world-map: compiled in 5.302s
+2026-07-30T17:43:53.4844266Z @superset-ui/legacy-preset-chart-nvd3: compiled in 6.455s
+2026-07-30T17:43:57.1738061Z @superset-ui/plugin-chart-cartodiagram: compiled in 7.029s
+2026-07-30T17:43:58.5336298Z @superset-ui/plugin-chart-ag-grid-table: compiled in 8.58s
+2026-07-30T17:44:03.2761574Z @superset-ui/plugin-chart-handlebars: compiled in 6.036s
+2026-07-30T17:44:05.8549001Z @superset-ui/plugin-chart-pivot-table: compiled in 7.27s
+2026-07-30T17:44:08.6245953Z @superset-ui/plugin-chart-echarts: compiled in 15.085s
+2026-07-30T17:44:09.9527591Z @superset-ui/plugin-chart-point-cluster-map: compiled in 6.588s
+2026-07-30T17:44:14.6996891Z @superset-ui/plugin-chart-table: compiled in 8.791s
+2026-07-30T17:44:14.8577196Z @superset-ui/plugin-chart-word-cloud: compiled in 6.163s
+2026-07-30T17:44:15.4769215Z @superset-ui/chart-controls: compiled in 0.714s
+2026-07-30T17:44:15.5076716Z @superset-ui/core: compiled in 0.603s
+2026-07-30T17:44:17.8844166Z @superset-ui/preset-chart-deckgl: compiled in 7.882s
+2026-07-30T17:44:17.8856263Z lerna success exec Executed command in 23 packages: "../../scripts/tsc.sh      --build"
+2026-07-30T17:44:18.0096898Z 
+2026-07-30T17:44:18.0097532Z > superset@0.0.0-dev type
+2026-07-30T17:44:18.0098012Z > cross-env NODE_OPTIONS="--max-old-space-size=8192" tsc --noEmit
+2026-07-30T17:44:18.0098359Z 
+2026-07-30T17:45:11.3983826Z Cleaning up orphan processes

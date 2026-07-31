@@ -1,0 +1,55 @@
+[
+  {
+    "ident": "dangerous-triggers",
+    "desc": "use of fundamentally insecure workflow trigger",
+    "url": "https://docs.zizmor.sh/audits/#dangerous-triggers",
+    "determinations": {
+      "confidence": "Medium",
+      "severity": "High",
+      "persona": "Regular"
+    },
+    "locations": [
+      {
+        "symbolic": {
+          "key": {
+            "Local": {
+              "prefix": ".github/",
+              "given_path": ".github/workflows/labeler.yml"
+            }
+          },
+          "annotation": "pull_request_target is almost always used insecurely",
+          "route": {
+            "route": [
+              {
+                "Key": "on"
+              }
+            ]
+          },
+          "feature_kind": "Normal",
+          "kind": "Primary"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 1,
+              "column": 0
+            },
+            "end_point": {
+              "row": 4,
+              "column": 39
+            },
+            "offset_span": {
+              "start": 29,
+              "end": 95
+            }
+          },
+          "feature": "on:\n- pull_request_target\n\n# cancel previous workflow jobs for PRs",
+          "comments": [
+            "# cancel previous workflow jobs for PRs"
+          ]
+        }
+      }
+    ],
+    "ignored": false
+  }
+]

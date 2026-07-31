@@ -1,0 +1,352 @@
+#!/usr/bin/env python3
+"""Launch and track one Devin session for one filed issue.
+
+    python run.py --issue 1            # launch
+    python run.py --poll               # poll everything in flight
+
+The budget check happens before the session is created, never after.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).parents[1] / "detector"))
+
+import prompt as prompt_mod  # noqa: E402
+import state  # noqa: E402
+from devin import DevinClient, load_env  # noqa: E402
+from gates import GATES_DIR, assert_clean_tree, production_only, run_mypy, run_oxlint  # noqa: E402
+from grouping import group  # noqa: E402
+
+WORKSTREAM_RULES = {
+    "A": "react-hooks/rules-of-hooks",
+    "B": "react/no-unstable-nested-components",
+    "C": "react/jsx-key",
+    "D": "@typescript-eslint/ban-ts-comment",
+    "E": "unused-ignore",
+}
+MYPY_WORKSTREAMS = {"E"}
+PRODUCTION_ONLY = {"D"}
+
+# Verified against a live v3 session, not against the docs: the response field is
+# `status` (not `status_enum`), spend is `acus_consumed`, and pull requests come
+# back as a list under `pull_requests`.
+TERMINAL = {"finished", "completed", "blocked", "expired", "stopped"}
+
+# `waiting_for_user` is reported with `status: "running"`, but the session has
+# stopped and is waiting to be spoken to. Left unhandled it sits in flight
+# forever, holding a concurrency slot against a session that will never move on
+# its own. Whether it is done or stuck is decided by what it produced, not by the
+# status string.
+IDLE_DETAIL = "waiting_for_user"
+
+
+def read_status(s: dict) -> tuple[str | None, float, str | None]:
+    status = s.get("status") or s.get("status_enum")
+    acu = s.get("acus_consumed") or 0
+    prs = s.get("pull_requests") or []
+    pr = None
+    if prs:
+        first = prs[0]
+        # The key is `pr_url`, not `url`. Reading the wrong one returns None,
+        # which is indistinguishable from "no pull request was opened" -- and
+        # that difference decides whether an idle session is recorded as finished
+        # or escalated. A missing field must not be able to masquerade as a
+        # negative result.
+        pr = first.get("pr_url") or first.get("url") if isinstance(first, dict) else str(first)
+    return status, float(acu), pr
+
+
+class LaunchError(Exception):
+    """A launch that should not happen, reported without a stack trace.
+
+    The webhook path invokes this module as a subprocess, so an uncaught
+    exception here surfaces as a traceback in the server log for what is often
+    an ordinary condition -- a stale delivery, an issue closed since it was
+    filed. Those should read as one line, not as a crash.
+    """
+
+
+def gh_issue(repo: str, number: int) -> dict:
+    r = subprocess.run(
+        ["gh", "issue", "view", str(number), "--repo", repo, "--json",
+         "number,title,body,labels,state"],
+        capture_output=True, text=True,
+    )
+    if r.returncode != 0:
+        raise LaunchError(f"issue #{number} not readable in {repo}: {r.stderr.strip()[:200]}")
+    return json.loads(r.stdout)
+
+
+def fingerprint_of(issue: dict) -> str:
+    marker = "<!-- ratchet-fingerprint: "
+    return issue["body"].split(marker, 1)[1].split(" -->", 1)[0].strip()
+
+
+def relabel(repo: str, number: int, add: str, remove: list[str]) -> None:
+    cmd = ["gh", "issue", "edit", str(number), "--repo", repo, "--add-label", add]
+    for r in remove:
+        cmd += ["--remove-label", r]
+    subprocess.run(cmd, capture_output=True)
+
+
+def launch(args, root: Path, env: dict, con) -> int:
+    repo, sha = env["FORK_REPO"], env["BASELINE_SHA"]
+    ceiling = float(env["GLOBAL_ACU_CEILING"])
+    per_session = int(env["MAX_ACU_PER_SESSION"])
+    max_conc = int(env["MAX_CONCURRENT_SESSIONS"])
+
+    spent = state.total_acu(con)
+    if spent + per_session > ceiling:
+        print(f"REFUSING: {spent:.1f} ACU spent, ceiling {ceiling}. "
+              f"Starting a session could exceed it.", file=sys.stderr)
+        return 2
+    if state.active_count(con) >= max_conc:
+        print(f"REFUSING: {state.active_count(con)} sessions already in flight "
+              f"(cap {max_conc}).", file=sys.stderr)
+        return 2
+
+    issue = gh_issue(repo, args.issue)
+    fp = fingerprint_of(issue)
+    ident = issue["title"].split("]")[0].lstrip("[")
+    workstream = ident[0]
+    rule = WORKSTREAM_RULES[workstream]
+
+    # Re-derive the findings from the gate rather than parsing them back out of
+    # the issue body. The issue is a human-facing artifact; the gate is the
+    # source of truth, and it may have moved since the issue was filed.
+    repo_path = (root / "superset-adham-clone").resolve()
+    assert_clean_tree(repo_path)
+    is_mypy = workstream in MYPY_WORKSTREAMS
+    all_findings = run_mypy(repo_path) if is_mypy else run_oxlint(repo_path, rule)
+    if workstream in PRODUCTION_ONLY:
+        all_findings = production_only(all_findings)
+    units = {u.fingerprint: u for u in group(all_findings, workstream)}
+    if fp not in units:
+        print(f"issue #{args.issue} has no matching findings any more -- already fixed?",
+              file=sys.stderr)
+        return 1
+    unit = units[fp]
+
+    if is_mypy:
+        text = prompt_mod.build_mypy(
+            repo=repo, sha=sha, area=unit.area, findings=unit.findings,
+            before=len(all_findings),
+            config_text=(GATES_DIR / "mypy-unused-ignore.ini").read_text().strip(),
+        )
+    else:
+        text = prompt_mod.build(
+            repo=repo, sha=sha, rule=rule, area=unit.area,
+            findings=unit.findings, before=len(all_findings),
+        )
+    if args.dry_run:
+        print(text)
+        return 0
+
+    client = DevinClient(env["DEVIN_API_KEY"], env["DEVIN_ORG_ID"], env["DEVIN_API_BASE"])
+    sess = client.create_session(
+        prompt=text,
+        title=f"[{unit.ident}] {rule} in {unit.area}",
+        tags=["debt-ratchet", f"workstream:{workstream}", f"issue:{args.issue}"],
+        max_acu=per_session,
+        idem_key=f"ratchet-{fp}",
+    )
+    state.record(
+        con, session_id=sess.session_id, issue_number=args.issue, fingerprint=fp,
+        workstream=workstream, rule=rule, area=unit.area, findings=len(unit.findings),
+        status="running", session_url=sess.url,
+    )
+    relabel(repo, args.issue, "devin:in-progress", ["devin:queued"])
+
+    # Post the session link on the issue at launch, not at completion.
+    #
+    # Devin puts the link in the pull request body itself, but that only exists
+    # once there *is* a pull request -- so a session that is still running, or
+    # that escalates without opening one, is unreachable from the issue that
+    # started it. The issue is the hub the whole system pivots on; anyone
+    # triaging one should be able to reach the run without going through this
+    # database.
+    subprocess.run(
+        ["gh", "issue", "comment", str(args.issue), "--repo", repo, "--body",
+         f"**Devin session started** — [`{sess.session_id[:12]}`]({sess.url})\n\n"
+         f"| | |\n|---|---|\n"
+         f"| Unit | `{unit.ident}` — `{unit.area}` |\n"
+         f"| Gate | `{rule}` |\n"
+         f"| Findings | {len(unit.findings)} across {len(unit.files)} files |\n"
+         f"| Budget | capped at {per_session} ACU |\n\n"
+         f"Result will be verified independently before merge; this comment is "
+         f"the audit trail from issue to run."],
+        capture_output=True,
+    )
+
+    print(f"session {sess.session_id}  new={sess.is_new}\n{sess.url}")
+    print(f"issue #{args.issue}  {unit.ident}  {unit.area}  "
+          f"{len(unit.findings)} findings  cap {per_session} ACU")
+    return 0
+
+
+def update_progress(client, con, row, repo: str, status: str, pr: str | None) -> None:
+    """Mirror the session's narration onto its issue, in one comment.
+
+    Edited in place rather than appended. A session emits ten to thirty messages;
+    posting each one turns the issue into a log file and buries the findings the
+    issue exists to describe. One comment that changes is readable -- and it is
+    also what makes the issue a live status page rather than an archive.
+    """
+    try:
+        msgs = client.get_messages(row["session_id"])
+    except Exception as e:
+        print(f"  (progress unavailable: {e})")
+        return
+
+    devin_msgs = [m for m in msgs if m.get("source") == "devin"]
+    if not devin_msgs:
+        return
+    newest = devin_msgs[-1].get("event_id")
+    if newest == row["last_event_id"] and row["progress_comment_id"]:
+        return  # nothing new to say
+
+    icon = {"merged": "✅", "escalated": "⚠️", "failed": "❌"}.get(status, "🔄")
+    lines = [
+        f"### {icon} Devin session `{row['session_id'][:12]}` — `{status}`",
+        "",
+        f"**{row['area']}** · `{row['rule']}` · {row['findings']} findings · "
+        f"[open session]({row['session_url']})",
+        "",
+    ]
+    if pr:
+        lines += [f"**Pull request:** {pr}", ""]
+    lines += ["<details open><summary>Progress</summary>", ""]
+    for m in devin_msgs[-12:]:
+        text = " ".join((m.get("message") or "").split())
+        lines.append(f"- {text[:300]}")
+    lines += ["", "</details>", "",
+              "<sub>Updated automatically while the session runs. Merge still "
+              "requires a human after independent verification.</sub>"]
+    body = "\n".join(lines)
+
+    if row["progress_comment_id"]:
+        r = subprocess.run(
+            ["gh", "api", "-X", "PATCH",
+             f"repos/{repo}/issues/comments/{row['progress_comment_id']}",
+             "-f", f"body={body}"],
+            capture_output=True, text=True)
+        if r.returncode == 0:
+            state.update(con, row["session_id"], last_event_id=newest)
+            return
+        # Comment deleted or otherwise unreachable -- fall through and re-create.
+
+    r = subprocess.run(
+        ["gh", "api", f"repos/{repo}/issues/{row['issue_number']}/comments",
+         "-f", f"body={body}", "--jq", ".id"],
+        capture_output=True, text=True)
+    if r.returncode == 0 and r.stdout.strip().isdigit():
+        state.update(con, row["session_id"],
+                     progress_comment_id=int(r.stdout.strip()), last_event_id=newest)
+
+
+def poll(args, root: Path, env: dict, con) -> int:
+    client = DevinClient(env["DEVIN_API_KEY"], env["DEVIN_ORG_ID"], env["DEVIN_API_BASE"])
+    rows = con.execute(
+        "SELECT * FROM sessions WHERE status IN ('queued','running','verifying')"
+    ).fetchall()
+    if not rows:
+        print("nothing in flight")
+    for row in rows:
+        s = client.get_session(row["session_id"])
+        st, acu, pr = read_status(s)
+        so = s.get("structured_output")
+        state.update(
+            con, row["session_id"], devin_status=st, acu_spent=acu,
+            pr_url=pr, structured=json.dumps(so) if so else None,
+        )
+        detail = (s.get("status_detail") or "")[:60]
+        print(f"#{row['issue_number']} {row['area']:24} {str(st):10} "
+              f"acu={acu:5.2f} pr={pr or '-'}  {detail}")
+
+        update_progress(client, con, row, env["FORK_REPO"], st or "running", pr)
+
+        if detail == IDLE_DETAIL and st not in TERMINAL:
+            # It produced a PR and a verdict, so it finished and simply never got
+            # told so. It produced neither, so it is stuck waiting on a human --
+            # which is an escalation regardless of what the status string says.
+            st = "finished" if (pr and so) else "blocked"
+            print(f"  -> idle; treating as {st}")
+
+        if st in TERMINAL:
+            _settle(con, env, row, st, pr, so)
+    print(f"\ntotal ACU spent: {state.total_acu(con):.2f} / {env['GLOBAL_ACU_CEILING']}")
+    return 0
+
+
+def _settle(con, env, row, st, pr, so) -> None:
+    repo = env["FORK_REPO"]
+    if st == "blocked":
+        state.update(con, row["session_id"], status="escalated")
+        relabel(repo, row["issue_number"], "status:escalated", ["devin:in-progress"])
+        reason = (so or {}).get("blocked_reason") or (so or {}).get("rationale") or "(none given)"
+        subprocess.run(
+            ["gh", "issue", "comment", str(row["issue_number"]), "--repo", repo, "--body",
+             f"**Devin stopped and escalated this.**\n\n> {reason}\n\n"
+             f"Session: {row['session_url']}\n\nThis needs a human decision. "
+             f"Retrying it would only spend ACUs on the same wall."],
+            capture_output=True,
+        )
+        print(f"  -> ESCALATED. Not retrying: a blocked session retried is just money.")
+    elif st == "expired":
+        state.update(con, row["session_id"], status="failed")
+        print(f"  -> expired (hit the {env['MAX_ACU_PER_SESSION']} ACU cap or timed out)")
+    elif st in ("finished", "completed"):
+        # Deliberately NOT 'merged'. The session claims it is done; verify.py has
+        # to reproduce that claim in our own container before anything is trusted.
+        state.update(con, row["session_id"], status="verifying")
+        print(f"  -> finished, awaiting independent verification")
+
+        # A declared behaviour change is not a failure -- the prompt asks for it
+        # to be declared rather than hidden, and here it caught a latent crash:
+        # TimeoutErrorMessage threw a TypeError on an empty issue_codes array
+        # because reduce() was called with no initial value. But it does mean the
+        # oracle is no longer sufficient on its own. A linter cannot tell you
+        # whether changed behaviour is *wanted*, so this routes to a human.
+        if (so or {}).get("behavior_change"):
+            relabel(repo, row["issue_number"], "needs:human-review", [])
+            subprocess.run(
+                ["gh", "issue", "comment", str(row["issue_number"]), "--repo", repo, "--body",
+                 f"**Devin reports a deliberate behaviour change.** Gate checks alone "
+                 f"cannot approve this -- a human needs to confirm the new behaviour is "
+                 f"wanted.\n\n> {(so or {}).get('rationale', '')[:900]}"],
+                capture_output=True,
+            )
+            print("  -> flagged: declared behaviour change, needs human review")
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--issue", type=int)
+    ap.add_argument("--poll", action="store_true")
+    ap.add_argument("--dry-run", action="store_true", help="print the prompt, spend nothing")
+    args = ap.parse_args()
+
+    root = Path(__file__).resolve().parents[2]
+    env = load_env(root)
+    con = state.connect(root)
+
+    try:
+        if args.poll:
+            return poll(args, root, env, con)
+        if args.issue:
+            return launch(args, root, env, con)
+    except LaunchError as e:
+        print(f"skipped: {e}", file=sys.stderr)
+        return 1
+    ap.error("need --issue or --poll")
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

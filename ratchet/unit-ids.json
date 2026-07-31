@@ -1,0 +1,114 @@
+{
+  "03e4b501707f": {
+    "area": "src/filters",
+    "ident": "D2"
+  },
+  "0c0b7f28ca7d": {
+    "area": "misc",
+    "ident": "C6"
+  },
+  "0dabc64ac6e5": {
+    "area": "plugins/plugin-chart-echarts",
+    "ident": "D3"
+  },
+  "0dc06a9679bd": {
+    "area": "src/explore",
+    "ident": "D4"
+  },
+  "0e82a58774cc": {
+    "area": "plugins/legacy-preset-chart-nvd3",
+    "ident": "D9"
+  },
+  "0f341e0a24b9": {
+    "area": "src/components",
+    "ident": "D8"
+  },
+  "321d91521774": {
+    "area": "packages/superset-ui-core",
+    "ident": "D1"
+  },
+  "3ef087f47eea": {
+    "area": "misc",
+    "ident": "D12"
+  },
+  "48034166258b": {
+    "area": "misc",
+    "ident": "E4"
+  },
+  "4e8f1f2b0f68": {
+    "area": "src/dashboard",
+    "ident": "D6"
+  },
+  "5360f2eb9fd1": {
+    "area": "src/pages",
+    "ident": "A1"
+  },
+  "5740d1712cfc": {
+    "area": "src/components",
+    "ident": "C5"
+  },
+  "6cbe8b9f3a1c": {
+    "area": "src/features",
+    "ident": "D10"
+  },
+  "6e098de3216b": {
+    "area": "src/SqlLab",
+    "ident": "A2"
+  },
+  "71ee5cd350c7": {
+    "area": "plugins/plugin-chart-table",
+    "ident": "A4"
+  },
+  "7ff60ee15b59": {
+    "area": "src/explore",
+    "ident": "C2"
+  },
+  "8401198be6aa": {
+    "area": "playwright",
+    "ident": "A5"
+  },
+  "860b6d599315": {
+    "area": "src/SqlLab",
+    "ident": "D5"
+  },
+  "9a3b134cacdf": {
+    "area": "misc",
+    "ident": "A6"
+  },
+  "9eebe8ba1fe2": {
+    "area": "plugins/plugin-chart-echarts",
+    "ident": "C1"
+  },
+  "a922e1043e16": {
+    "area": "superset/security",
+    "ident": "E3"
+  },
+  "c954e08c21ee": {
+    "area": "superset/core/api",
+    "ident": "E1"
+  },
+  "cc1a2789a25f": {
+    "area": "superset/semantic_layers",
+    "ident": "E2"
+  },
+  "ce08570b9b75": {
+    "area": "plugins/preset-chart-deckgl",
+    "ident": "D7"
+  },
+  "de1707890c50": {
+    "area": "packages/superset-ui-chart-controls",
+    "ident": "C4"
+  },
+  "eb7e0e1e7083": {
+    "area": "src/dashboard",
+    "ident": "C3"
+  },
+  "ecbebfcafa67": {
+    "area": "packages/superset-ui-core",
+    "ident": "A3"
+  },
+  "fc4c2fb5263e": {
+    "area": "packages/superset-core",
+    "ident": "D11"
+  }
+}

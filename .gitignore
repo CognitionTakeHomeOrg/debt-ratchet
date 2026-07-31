@@ -1,0 +1,21 @@
+# Secrets
+.env
+
+# Internal planning documents
+identified-issues.md
+demo-plan.md
+implementation-plan.md
+additional-context.md
+
+# Working clones (separate repos)
+superset/
+superset-adham-clone/
+.verify-worktree/
+
+# Runtime
+*.pyc
+__pycache__/
+.venv/
+node_modules/
+ratchet/state.db
+.mypy-gate/
