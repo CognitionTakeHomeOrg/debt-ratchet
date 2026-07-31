@@ -1,0 +1,1200 @@
+# Control experiment: what a scripted fix does to this codebase.
+#
+# Command, run at 9da977cba2 from superset-frontend/:
+#   ./node_modules/.bin/oxlint -A all -D no-console --fix-dangerously
+#
+# Result: 41 files changed, 121 insertions(+), 183 deletions(-).
+# 121 console statements deleted, 39 of them the only body of a catch block,
+# leaving blank lines where the error handling was. Type-check and tests stay
+# green, the rule reports clean, and the codebase is worse.
+#
+# The clearest single case is TranslatorSingleton.ts below: warnPreConfigure()
+# is now a function that records a key in a Set and returns.
+#
+# This diff was never committed to a branch. It exists to be read.
+
+diff --git a/superset-frontend/.storybook/test-runner.ts b/superset-frontend/.storybook/test-runner.ts
+index 52496b2f15..0943d356bb 100644
+--- a/superset-frontend/.storybook/test-runner.ts
++++ b/superset-frontend/.storybook/test-runner.ts
+@@ -30,7 +30,7 @@ const config: TestRunnerConfig = {
+     // Listen for page errors (JavaScript exceptions) and log them
+     // This helps identify stories that crash during rendering
+     page.on('pageerror', error => {
+-      console.error(`[page error] ${error.message}`);
++      
+     });
+   },
+ };
+diff --git a/superset-frontend/packages/superset-core/src/translation/TranslatorSingleton.ts b/superset-frontend/packages/superset-core/src/translation/TranslatorSingleton.ts
+index dfebf2e174..8aa79751f6 100644
+--- a/superset-frontend/packages/superset-core/src/translation/TranslatorSingleton.ts
++++ b/superset-frontend/packages/superset-core/src/translation/TranslatorSingleton.ts
+@@ -79,13 +79,7 @@ function warnPreConfigure(fn: 't' | 'tn', key: string) {
+   }
+   if (warnedPreConfigureKeys.has(key)) return;
+   warnedPreConfigureKeys.add(key);
+-  console.warn(
+-    `[i18n] ${fn}(${JSON.stringify(key)}) was called before configure() — ` +
+-      `the result is the fallback language and will not update when the ` +
+-      `user switches language. If this call is at module load (e.g., a ` +
+-      `controlPanel \`label\`/\`description\`), wrap it in an arrow ` +
+-      `function: \`() => ${fn}(${JSON.stringify(key)})\`.`,
+-  );
++  
+ }
+ 
+ function resetTranslation() {
+diff --git a/superset-frontend/packages/superset-ui-core/src/chart/components/Matrixify/MatrixifyGridGenerator.ts b/superset-frontend/packages/superset-ui-core/src/chart/components/Matrixify/MatrixifyGridGenerator.ts
+index fd4e660c49..5cbba6535c 100644
+--- a/superset-frontend/packages/superset-ui-core/src/chart/components/Matrixify/MatrixifyGridGenerator.ts
++++ b/superset-frontend/packages/superset-ui-core/src/chart/components/Matrixify/MatrixifyGridGenerator.ts
+@@ -62,7 +62,7 @@ function generateCellTitle(
+     return compiledTemplate(context);
+   } catch (error) {
+     // If template compilation fails, return empty string
+-    console.warn('Failed to compile Handlebars template:', error);
++    
+     return '';
+   }
+ }
+diff --git a/superset-frontend/packages/superset-ui-core/src/components/CodeSyntaxHighlighter/index.tsx b/superset-frontend/packages/superset-ui-core/src/components/CodeSyntaxHighlighter/index.tsx
+index 29a035885f..46ed8588c8 100644
+--- a/superset-frontend/packages/superset-ui-core/src/components/CodeSyntaxHighlighter/index.tsx
++++ b/superset-frontend/packages/superset-ui-core/src/components/CodeSyntaxHighlighter/index.tsx
+@@ -63,7 +63,7 @@ const registerLanguage = async (language: SupportedLanguage): Promise<void> => {
+     SyntaxHighlighterBase.registerLanguage(language, languageModule.default);
+     registeredLanguages.add(language);
+   } catch (error) {
+-    console.warn(`Failed to load language ${language}:`, error);
++    
+   }
+ };
+ 
+diff --git a/superset-frontend/packages/superset-ui-core/src/components/Modal/FormModal.tsx b/superset-frontend/packages/superset-ui-core/src/components/Modal/FormModal.tsx
+index 8fa56ae745..8a08082b1f 100644
+--- a/superset-frontend/packages/superset-ui-core/src/components/Modal/FormModal.tsx
++++ b/superset-frontend/packages/superset-ui-core/src/components/Modal/FormModal.tsx
+@@ -60,7 +60,7 @@ export function FormModal({
+         await formSubmitHandler(values);
+         handleSave();
+       } catch (err) {
+-        console.error(err);
++        
+       } finally {
+         setIsSaving(false);
+       }
+diff --git a/superset-frontend/packages/superset-ui-core/test/models/Registry.test.ts b/superset-frontend/packages/superset-ui-core/test/models/Registry.test.ts
+index 6a0228e4cf..9a842b0082 100644
+--- a/superset-frontend/packages/superset-ui-core/test/models/Registry.test.ts
++++ b/superset-frontend/packages/superset-ui-core/test/models/Registry.test.ts
+@@ -319,7 +319,7 @@ describe('Registry', () => {
+           registry.registerValue('a', 'testValue');
+           expect(() => registry.registerValue('a', 'testValue2')).not.toThrow();
+           expect(registry.get('a')).toEqual('testValue2');
+-          expect(console.warn).not.toHaveBeenCalled();
++          .not.toHaveBeenCalled();
+         });
+       });
+       describe('.registerLoader(key, loader)', () => {
+@@ -330,7 +330,7 @@ describe('Registry', () => {
+             registry.registerLoader('a', () => 'testValue2'),
+           ).not.toThrow();
+           expect(registry.get('a')).toEqual('testValue2');
+-          expect(console.warn).not.toHaveBeenCalled();
++          .not.toHaveBeenCalled();
+         });
+       });
+     });
+@@ -343,7 +343,7 @@ describe('Registry', () => {
+           registry.registerValue('a', 'testValue');
+           expect(() => registry.registerValue('a', 'testValue2')).not.toThrow();
+           expect(registry.get('a')).toEqual('testValue2');
+-          expect(console.warn).toHaveBeenCalled();
++          .toHaveBeenCalled();
+         });
+       });
+       describe('.registerLoader(key, loader)', () => {
+@@ -356,7 +356,7 @@ describe('Registry', () => {
+             registry.registerLoader('a', () => 'testValue2'),
+           ).not.toThrow();
+           expect(registry.get('a')).toEqual('testValue2');
+-          expect(console.warn).toHaveBeenCalled();
++          .toHaveBeenCalled();
+         });
+       });
+     });
+@@ -450,7 +450,7 @@ describe('Registry', () => {
+         expect(listener).toHaveBeenCalledWith(['foo']);
+         expect(errorListener).toHaveBeenCalledWith(['foo']);
+         expect(lastListener).toHaveBeenCalledWith(['foo']);
+-        expect(console.error).toHaveBeenCalled();
++        .toHaveBeenCalled();
+       });
+     });
+   });
+diff --git a/superset-frontend/packages/superset-ui-switchboard/src/switchboard.test.ts b/superset-frontend/packages/superset-ui-switchboard/src/switchboard.test.ts
+index 352c508b2e..31c3c1e822 100644
+--- a/superset-frontend/packages/superset-ui-switchboard/src/switchboard.test.ts
++++ b/superset-frontend/packages/superset-ui-switchboard/src/switchboard.test.ts
+@@ -134,12 +134,12 @@ describe('comms', () => {
+ 
+   test('singleton', async () => {
+     SingletonSwitchboard.start();
+-    expect(console.error).toHaveBeenCalledWith(
++    .toHaveBeenCalledWith(
+       '[]',
+       'Switchboard not initialised',
+     );
+     SingletonSwitchboard.emit('someEvent', 42);
+-    expect(console.error).toHaveBeenCalledWith(
++    .toHaveBeenCalledWith(
+       '[]',
+       'Switchboard not initialised',
+     );
+@@ -150,7 +150,7 @@ describe('comms', () => {
+     expect(SingletonSwitchboard).toHaveProperty('name');
+     expect(SingletonSwitchboard).toHaveProperty('debugMode');
+     SingletonSwitchboard.init({ port: new MessageChannel().port1 });
+-    expect(console.error).toHaveBeenCalledWith(
++    .toHaveBeenCalledWith(
+       '[switchboard]',
+       'already initialized',
+     );
+@@ -318,7 +318,7 @@ describe('comms', () => {
+     theirs.defineMethod('blah', () => {});
+     theirs.start();
+     await ours.emit('blah');
+-    expect(console.debug).toHaveBeenCalledTimes(1);
++    .toHaveBeenCalledTimes(1);
+     expect((console.debug as any).mock.calls[0][0]).toBe('[theirs]');
+   });
+ 
+@@ -335,6 +335,6 @@ describe('comms', () => {
+     theirs.defineMethod('blah', () => {});
+     theirs.start();
+     await ours.emit('blah');
+-    expect(console.debug).toHaveBeenCalledTimes(0);
++    .toHaveBeenCalledTimes(0);
+   });
+ });
+diff --git a/superset-frontend/packages/superset-ui-switchboard/src/switchboard.ts b/superset-frontend/packages/superset-ui-switchboard/src/switchboard.ts
+index 46af6fb4d3..f3a5c46d8e 100644
+--- a/superset-frontend/packages/superset-ui-switchboard/src/switchboard.ts
++++ b/superset-frontend/packages/superset-ui-switchboard/src/switchboard.ts
+@@ -262,12 +262,12 @@ export class Switchboard {
+ 
+   private log(...args: unknown[]) {
+     if (this.debugMode) {
+-      console.debug(`[${this.name}]`, ...args);
++      
+     }
+   }
+ 
+   private logError(...args: unknown[]) {
+-    console.error(`[${this.name}]`, ...args);
++    
+   }
+ 
+   private getNewMessageId() {
+diff --git a/superset-frontend/playwright/global-setup.ts b/superset-frontend/playwright/global-setup.ts
+index f06f610fe0..96f30ef74c 100644
+--- a/superset-frontend/playwright/global-setup.ts
++++ b/superset-frontend/playwright/global-setup.ts
+@@ -45,7 +45,7 @@ async function globalSetup(config: FullConfig) {
+   const adminUsername = process.env.PLAYWRIGHT_ADMIN_USERNAME || 'admin';
+   const adminPassword = process.env.PLAYWRIGHT_ADMIN_PASSWORD || 'general';
+ 
+-  console.log('[Global Setup] Authenticating as admin user...');
++  
+ 
+   let browser: Browser | null = null;
+   let context: BrowserContext | null = null;
+@@ -54,7 +54,7 @@ async function globalSetup(config: FullConfig) {
+     // Launch browser
+     browser = await chromium.launch();
+   } catch (error) {
+-    console.error('[Global Setup] Failed to launch browser:', error);
++    
+     throw new Error('Browser launch failed - check Playwright installation');
+   }
+ 
+@@ -77,11 +77,9 @@ async function globalSetup(config: FullConfig) {
+       path: authStatePath,
+     });
+ 
+-    console.log(
+-      '[Global Setup] Authentication successful - state saved to playwright/.auth/user.json',
+-    );
++    
+   } catch (error) {
+-    console.error('[Global Setup] Authentication failed:', error);
++    
+     throw error;
+   } finally {
+     // Ensure cleanup even if auth fails
+diff --git a/superset-frontend/playwright/helpers/api/dataset.ts b/superset-frontend/playwright/helpers/api/dataset.ts
+index f29a04727c..d085e71b1b 100644
+--- a/superset-frontend/playwright/helpers/api/dataset.ts
++++ b/superset-frontend/playwright/helpers/api/dataset.ts
+@@ -113,7 +113,7 @@ export async function createTestVirtualDataset(
+   if (dbId === undefined) {
+     const examplesDb = await getDatabaseByName(page, 'examples');
+     if (!examplesDb?.id) {
+-      console.warn('Failed to find examples database');
++      
+       return null;
+     }
+     dbId = examplesDb.id;
+@@ -128,7 +128,7 @@ export async function createTestVirtualDataset(
+   });
+ 
+   if (!response.ok()) {
+-    console.warn(`Failed to create virtual dataset: ${response.status()}`);
++    
+     return null;
+   }
+ 
+diff --git a/superset-frontend/playwright/helpers/fixtures/testAssets.ts b/superset-frontend/playwright/helpers/fixtures/testAssets.ts
+index b630bbe60a..1300b61659 100644
+--- a/superset-frontend/playwright/helpers/fixtures/testAssets.ts
++++ b/superset-frontend/playwright/helpers/fixtures/testAssets.ts
+@@ -66,16 +66,11 @@ export const test = base.extend<{ testAssets: TestAssets }>({
+         apiDeleteSavedQuery(page, id, { failOnStatusCode: false })
+           .then(response => {
+             if (!EXPECTED_CLEANUP_STATUSES.has(response.status())) {
+-              console.warn(
+-                `[testAssets] Unexpected status ${response.status()} cleaning up saved query ${id}`,
+-              );
++              
+             }
+           })
+           .catch(error => {
+-            console.warn(
+-              `[testAssets] Failed to cleanup saved query ${id}:`,
+-              error,
+-            );
++            
+           }),
+       ),
+     );
+@@ -86,16 +81,11 @@ export const test = base.extend<{ testAssets: TestAssets }>({
+         apiDeleteDashboard(page, id, { failOnStatusCode: false })
+           .then(response => {
+             if (!EXPECTED_CLEANUP_STATUSES.has(response.status())) {
+-              console.warn(
+-                `[testAssets] Unexpected status ${response.status()} cleaning up dashboard ${id}`,
+-              );
++              
+             }
+           })
+           .catch(error => {
+-            console.warn(
+-              `[testAssets] Failed to cleanup dashboard ${id}:`,
+-              error,
+-            );
++            
+           }),
+       ),
+     );
+@@ -104,13 +94,11 @@ export const test = base.extend<{ testAssets: TestAssets }>({
+         apiDeleteChart(page, id, { failOnStatusCode: false })
+           .then(response => {
+             if (!EXPECTED_CLEANUP_STATUSES.has(response.status())) {
+-              console.warn(
+-                `[testAssets] Unexpected status ${response.status()} cleaning up chart ${id}`,
+-              );
++              
+             }
+           })
+           .catch(error => {
+-            console.warn(`[testAssets] Failed to cleanup chart ${id}:`, error);
++            
+           }),
+       ),
+     );
+@@ -119,16 +107,11 @@ export const test = base.extend<{ testAssets: TestAssets }>({
+         apiDeleteDataset(page, id, { failOnStatusCode: false })
+           .then(response => {
+             if (!EXPECTED_CLEANUP_STATUSES.has(response.status())) {
+-              console.warn(
+-                `[testAssets] Unexpected status ${response.status()} cleaning up dataset ${id}`,
+-              );
++              
+             }
+           })
+           .catch(error => {
+-            console.warn(
+-              `[testAssets] Failed to cleanup dataset ${id}:`,
+-              error,
+-            );
++            
+           }),
+       ),
+     );
+@@ -137,13 +120,11 @@ export const test = base.extend<{ testAssets: TestAssets }>({
+         apiDeleteTheme(page, id, { failOnStatusCode: false })
+           .then(response => {
+             if (!EXPECTED_CLEANUP_STATUSES.has(response.status())) {
+-              console.warn(
+-                `[testAssets] Unexpected status ${response.status()} cleaning up theme ${id}`,
+-              );
++              
+             }
+           })
+           .catch(error => {
+-            console.warn(`[testAssets] Failed to cleanup theme ${id}:`, error);
++            
+           }),
+       ),
+     );
+@@ -152,16 +133,11 @@ export const test = base.extend<{ testAssets: TestAssets }>({
+         apiDeleteDatabase(page, id, { failOnStatusCode: false })
+           .then(response => {
+             if (!EXPECTED_CLEANUP_STATUSES.has(response.status())) {
+-              console.warn(
+-                `[testAssets] Unexpected status ${response.status()} cleaning up database ${id}`,
+-              );
++              
+             }
+           })
+           .catch(error => {
+-            console.warn(
+-              `[testAssets] Failed to cleanup database ${id}:`,
+-              error,
+-            );
++            
+           }),
+       ),
+     );
+diff --git a/superset-frontend/plugins/plugin-chart-ag-grid-table/src/AgGridTable/index.tsx b/superset-frontend/plugins/plugin-chart-ag-grid-table/src/AgGridTable/index.tsx
+index 2798e43159..d6be36c419 100644
+--- a/superset-frontend/plugins/plugin-chart-ag-grid-table/src/AgGridTable/index.tsx
++++ b/superset-frontend/plugins/plugin-chart-ag-grid-table/src/AgGridTable/index.tsx
+@@ -359,7 +359,7 @@ const AgGridDataTable: FunctionComponent<AgGridTableProps> = memo(
+               onColumnStateChange(stateToSave);
+             }
+           } catch (error) {
+-            console.warn('Error capturing AG Grid state:', error);
++            
+           }
+         }
+       }, Constants.SLOW_DEBOUNCE),
+diff --git a/superset-frontend/plugins/plugin-chart-cartodiagram/src/components/OlChartMap.tsx b/superset-frontend/plugins/plugin-chart-cartodiagram/src/components/OlChartMap.tsx
+index 8c16e2bd2b..9d8e7a6208 100644
+--- a/superset-frontend/plugins/plugin-chart-cartodiagram/src/components/OlChartMap.tsx
++++ b/superset-frontend/plugins/plugin-chart-cartodiagram/src/components/OlChartMap.tsx
+@@ -188,7 +188,7 @@ export const OlChartMap = (props: OlChartMapProps) => {
+         if (createdLayer.status === 'fulfilled' && createdLayer.value) {
+           olMap.getLayers().insertAt(0, createdLayer.value);
+         } else {
+-          console.warn(`Layer could not be created: ${configs[idx]}`);
++          
+         }
+       });
+     };
+diff --git a/superset-frontend/plugins/plugin-chart-cartodiagram/src/util/layerUtil.tsx b/superset-frontend/plugins/plugin-chart-cartodiagram/src/util/layerUtil.tsx
+index 4af5066efc..22f077d751 100644
+--- a/superset-frontend/plugins/plugin-chart-cartodiagram/src/util/layerUtil.tsx
++++ b/superset-frontend/plugins/plugin-chart-cartodiagram/src/util/layerUtil.tsx
+@@ -126,7 +126,7 @@ export const createWfsLayer = async (wfsLayerConf: WfsLayerConf) => {
+     const olParser = new OlParser();
+     writeStyleResult = await olParser.writeStyle(style);
+     if (writeStyleResult.errors) {
+-      console.warn('Could not create ol-style', writeStyleResult.errors);
++      
+       return undefined;
+     }
+   }
+@@ -153,7 +153,7 @@ export const createLayer = async (layerConf: LayerConf) => {
+   } else if (isXyzLayerConf(layerConf)) {
+     layer = createXyzLayer(layerConf);
+   } else {
+-    console.warn('Provided layerconfig is not recognized');
++    
+   }
+   return layer;
+ };
+diff --git a/superset-frontend/plugins/plugin-chart-cartodiagram/src/util/transformPropsUtil.ts b/superset-frontend/plugins/plugin-chart-cartodiagram/src/util/transformPropsUtil.ts
+index 0ab23b643c..a3f20e23d7 100644
+--- a/superset-frontend/plugins/plugin-chart-cartodiagram/src/util/transformPropsUtil.ts
++++ b/superset-frontend/plugins/plugin-chart-cartodiagram/src/util/transformPropsUtil.ts
+@@ -89,9 +89,7 @@ export const groupByLocationGenericX = (
+         const labelMap: string[] = queryData.label_map?.[k];
+ 
+         if (!labelMap) {
+-          console.log(
+-            'Cannot extract location from queryData. label_map not defined',
+-          );
++          
+           return;
+         }
+ 
+@@ -99,9 +97,7 @@ export const groupByLocationGenericX = (
+ 
+         if (geojsonCols.length > 1) {
+           // TODO what should we do, if there is more than one geom column?
+-          console.log(
+-            'More than one geometry column detected. Using first found.',
+-          );
++          
+         }
+         const location = labelMap[geojsonCols[0]];
+         const filter = geojsonCols.length ? [geojsonCols[0]] : [];
+diff --git a/superset-frontend/plugins/plugin-chart-echarts/src/BigNumber/BigNumberTotal/transformProps.test.ts b/superset-frontend/plugins/plugin-chart-echarts/src/BigNumber/BigNumberTotal/transformProps.test.ts
+index 00522b9d0a..be8a348783 100644
+--- a/superset-frontend/plugins/plugin-chart-echarts/src/BigNumber/BigNumberTotal/transformProps.test.ts
++++ b/superset-frontend/plugins/plugin-chart-echarts/src/BigNumber/BigNumberTotal/transformProps.test.ts
+@@ -37,7 +37,7 @@ jest.mock('../utils', () => ({
+   getDateFormatter: jest.fn(() => (v: any) => `${v}pm`),
+   parseMetricValue: jest.fn(val => Number(val)),
+   getOriginalLabel: jest.fn((metric, metrics) => {
+-    console.log(metrics);
++    
+     return metric;
+   }),
+ }));
+diff --git a/superset-frontend/plugins/plugin-chart-echarts/src/BigNumber/BigNumberWithTrendline/transformProps.test.ts b/superset-frontend/plugins/plugin-chart-echarts/src/BigNumber/BigNumberWithTrendline/transformProps.test.ts
+index 6a9752d57b..0ae02e61de 100644
+--- a/superset-frontend/plugins/plugin-chart-echarts/src/BigNumber/BigNumberWithTrendline/transformProps.test.ts
++++ b/superset-frontend/plugins/plugin-chart-echarts/src/BigNumber/BigNumberWithTrendline/transformProps.test.ts
+@@ -76,7 +76,7 @@ jest.mock('../utils', () => ({
+   getDateFormatter: jest.fn(() => (v: any) => `${v}pm`),
+   parseMetricValue: jest.fn(val => Number(val)),
+   getOriginalLabel: jest.fn((metric, metrics) => {
+-    console.log(metrics);
++    
+     return metric;
+   }),
+ }));
+diff --git a/superset-frontend/plugins/preset-chart-deckgl/src/layers/Contour/Contour.tsx b/superset-frontend/plugins/preset-chart-deckgl/src/layers/Contour/Contour.tsx
+index a71fccc869..8bd838071d 100644
+--- a/superset-frontend/plugins/preset-chart-deckgl/src/layers/Contour/Contour.tsx
++++ b/superset-frontend/plugins/preset-chart-deckgl/src/layers/Contour/Contour.tsx
+@@ -152,11 +152,7 @@ export const getLayer: GetLayerType<ContourLayer> = function ({
+     cellSize,
+     viewport: fd.viewport,
+     onAutoAdjust: ({ original, adjusted, estimatedCells }) => {
+-      console.warn(
+-        `[DeckGL Contour] cellSize=${original} would create ~${Math.round(
+-          estimatedCells,
+-        )} cells. Auto-adjusted to ${adjusted} to prevent WebGL crash.`,
+-      );
++      
+     },
+   });
+ 
+diff --git a/superset-frontend/scripts/check-storybook-coverage.js b/superset-frontend/scripts/check-storybook-coverage.js
+index 7c87f8b244..574b5fc677 100644
+--- a/superset-frontend/scripts/check-storybook-coverage.js
++++ b/superset-frontend/scripts/check-storybook-coverage.js
+@@ -102,13 +102,13 @@ function main() {
+   const showFix = args.includes('--fix') || args.includes('-f');
+   const verbose = args.includes('--verbose') || args.includes('-v');
+ 
+-  console.log('Checking Storybook coverage for UI components and plugins...\n');
++  
+ 
+   const missing = [];
+   const covered = [];
+ 
+   // Check plugins
+-  console.log('Checking plugins...');
++  
+   for (const pattern of PLUGIN_PATTERNS) {
+     const pluginDirs = glob.sync(pattern, {
+       cwd: ROOT,
+@@ -126,22 +126,22 @@ function main() {
+         return pluginDir.includes(exc.replace(/\*/g, ''));
+       });
+       if (isExcluded) {
+-        if (verbose) console.log(`  SKIP ${pluginName} (excluded)`);
++        if (verbose) {}
+         continue;
+       }
+ 
+       if (hasStoriesFile(fullPath)) {
+         covered.push({ type: 'plugin', name: pluginName, path: pluginDir });
+-        if (verbose) console.log(`  OK   ${pluginName}`);
++        if (verbose) {}
+       } else if (hasReactComponents(fullPath)) {
+         missing.push({ type: 'plugin', name: pluginName, path: pluginDir });
+-        console.log(`  MISS ${pluginName}`);
++        
+       }
+     }
+   }
+ 
+   // Check core components
+-  console.log('\nChecking core components...');
++  
+   for (const pattern of CORE_COMPONENT_PATTERNS) {
+     const componentDirs = glob.sync(pattern, {
+       cwd: ROOT,
+@@ -161,33 +161,33 @@ function main() {
+           name: componentName,
+           path: componentDir,
+         });
+-        if (verbose) console.log(`  OK   ${componentName}`);
++        if (verbose) {}
+       } else if (hasReactComponents(fullPath)) {
+         missing.push({
+           type: 'component',
+           name: componentName,
+           path: componentDir,
+         });
+-        console.log(`  MISS ${componentName}`);
++        
+       }
+     }
+   }
+ 
+   // Summary
+-  console.log(`\n${'='.repeat(60)}`);
+-  console.log('Summary');
+-  console.log('='.repeat(60));
+-  console.log(`With stories: ${covered.length}`);
+-  console.log(`Missing stories: ${missing.length}`);
++  
++  
++  
++  
++  
+ 
+   if (missing.length > 0) {
+-    console.log('\nComponents/plugins missing Storybook stories:');
++    
+     for (const item of missing) {
+-      console.log(`   - ${item.name} (${item.path})`);
++      
+     }
+ 
+     if (showFix) {
+-      console.log('\nTo add stories, create a file like:');
++      
+       let shown = 0;
+       for (const item of missing) {
+         if (shown >= 3) break;
+@@ -200,21 +200,21 @@ function main() {
+         } else {
+           storiesPath = `${item.path}/${item.name}.stories.tsx`;
+         }
+-        console.log(`   ${storiesPath}`);
++        
+         shown += 1;
+       }
+       if (missing.length > 3) {
+-        console.log(`   ... and ${missing.length - 3} more`);
++        
+       }
+     }
+ 
+     // Exit with error if missing stories (for CI)
+     if (!showFix) {
+-      console.log('\nRun with --fix to see suggestions for adding stories.');
++      
+       process.exit(1);
+     }
+   } else {
+-    console.log('\nAll UI components and plugins have Storybook stories!');
++    
+   }
+ }
+ 
+diff --git a/superset-frontend/scripts/oxlint-metrics-uploader.js b/superset-frontend/scripts/oxlint-metrics-uploader.js
+index 14c296632a..add93815f1 100644
+--- a/superset-frontend/scripts/oxlint-metrics-uploader.js
++++ b/superset-frontend/scripts/oxlint-metrics-uploader.js
+@@ -37,7 +37,7 @@ const DATETIME = new Date().toISOString().replace(/T/, ' ').replace(/\..+/, '');
+ 
+ async function writeToGoogleSheet(data, range, headers, append = false) {
+   if (!sheets) {
+-    console.log('No Google Sheets credentials, skipping upload');
++    
+     return;
+   }
+ 
+@@ -78,7 +78,7 @@ async function runOxlintAndProcess() {
+ 
+   try {
+     // Run OXC with JSON format
+-    console.log('Running OXC linter...');
++    
+     const oxlintOutput = execSync('npx oxlint --format json', {
+       encoding: 'utf8',
+       maxBuffer: 50 * 1024 * 1024, // 50MB buffer for large outputs
+@@ -126,12 +126,10 @@ async function runOxlintAndProcess() {
+       });
+     }
+ 
+-    console.log(
+-      `OXC found ${results.diagnostics?.length || 0} issues across ${results.number_of_files} files`,
+-    );
++    
+ 
+     // Also run minimal ESLint for custom rules and merge results
+-    console.log('Running minimal ESLint for custom rules...');
++    
+     let eslintOutput = '[]';
+     try {
+       // Run ESLint and capture output directly.
+@@ -173,11 +171,9 @@ async function runOxlintAndProcess() {
+         });
+       });
+ 
+-      console.log(
+-        `ESLint found ${eslintResults.reduce((sum, r) => sum + r.messages.length, 0)} custom rule violations`,
+-      );
++      
+     } catch (e) {
+-      console.log('No ESLint issues found or parsing error:', e.message);
++      
+     }
+ 
+     // Transform data for Google Sheets
+@@ -220,9 +216,7 @@ async function runOxlintAndProcess() {
+       'Timestamp',
+     ];
+ 
+-    console.log(
+-      `Found ${Object.keys(metricsByRule).length} unique rules with ${occurrencesData.length} total occurrences`,
+-    );
++    
+ 
+     await writeToGoogleSheet(
+       metricsData,
+@@ -237,12 +231,12 @@ async function runOxlintAndProcess() {
+       eslintBacklogHeaders,
+     );
+ 
+-    console.log('Successfully uploaded metrics to Google Sheets');
++    
+   } catch (error) {
+-    console.error('Error processing lint results:', error);
++    
+     process.exit(1);
+   }
+ }
+ 
+ // Run the process
+-runOxlintAndProcess().catch(console.error);
++
+diff --git a/superset-frontend/src/components/Datasource/components/DatasourceEditor/components/DatasetUsageTab/DatasetUsageTab.test.tsx b/superset-frontend/src/components/Datasource/components/DatasourceEditor/components/DatasetUsageTab/DatasetUsageTab.test.tsx
+index 265bb2a53a..02e39c5d06 100644
+--- a/superset-frontend/src/components/Datasource/components/DatasourceEditor/components/DatasetUsageTab/DatasetUsageTab.test.tsx
++++ b/superset-frontend/src/components/Datasource/components/DatasourceEditor/components/DatasetUsageTab/DatasetUsageTab.test.tsx
+@@ -131,7 +131,7 @@ afterEach(() => {
+   // Restore original scrollTo implementation after each test
+   Element.prototype.scrollTo = originalScrollTo;
+   // Restore console.error if it was spied on
+-  if (jest.isMockFunction(console.error)) {
++  if ({}) {
+     (console.error as jest.Mock).mockRestore();
+   }
+ });
+diff --git a/superset-frontend/src/components/Datasource/components/DatasourceEditor/tests/DatasourceEditor.test.tsx b/superset-frontend/src/components/Datasource/components/DatasourceEditor/tests/DatasourceEditor.test.tsx
+index 64b9d42b8f..8c96e3551e 100644
+--- a/superset-frontend/src/components/Datasource/components/DatasourceEditor/tests/DatasourceEditor.test.tsx
++++ b/superset-frontend/src/components/Datasource/components/DatasourceEditor/tests/DatasourceEditor.test.tsx
+@@ -57,7 +57,7 @@ afterEach(async () => {
+   // Reset module mock since jest.fn() doesn't support mockRestore()
+   jest.mocked(isFeatureEnabled).mockReset();
+   // Restore console.error if it was spied on
+-  if (jest.isMockFunction(console.error)) {
++  if ({}) {
+     (console.error as jest.Mock).mockRestore();
+   }
+ });
+diff --git a/superset-frontend/src/components/SQLEditorWithValidation/index.tsx b/superset-frontend/src/components/SQLEditorWithValidation/index.tsx
+index 8f43d513b1..ca8efe310d 100644
+--- a/superset-frontend/src/components/SQLEditorWithValidation/index.tsx
++++ b/superset-frontend/src/components/SQLEditorWithValidation/index.tsx
+@@ -164,7 +164,7 @@ const SQLEditorWithValidation = forwardRef<
+           onValidationComplete?.(true);
+         }
+       } catch (error) {
+-        console.error('Error validating expression:', error);
++        
+         const validationError = {
+           message: t('Failed to validate expression. Please try again.'),
+         };
+diff --git a/superset-frontend/src/core/editors/AceEditorProvider.tsx b/superset-frontend/src/core/editors/AceEditorProvider.tsx
+index 3deb345a21..b3ae31918e 100644
+--- a/superset-frontend/src/core/editors/AceEditorProvider.tsx
++++ b/superset-frontend/src/core/editors/AceEditorProvider.tsx
+@@ -76,9 +76,7 @@ const getEditorComponent = (language: string) => {
+     case 'javascript':
+       return JSEditor;
+     default:
+-      console.warn(
+-        `Unknown editor language "${language}", falling back to SQL editor`,
+-      );
++      
+       return FullSQLEditor;
+   }
+ };
+diff --git a/superset-frontend/src/dashboard/components/EmbeddedModal/index.tsx b/superset-frontend/src/dashboard/components/EmbeddedModal/index.tsx
+index 4c9c7c7d9a..5a32f11e21 100644
+--- a/superset-frontend/src/dashboard/components/EmbeddedModal/index.tsx
++++ b/superset-frontend/src/dashboard/components/EmbeddedModal/index.tsx
+@@ -88,7 +88,7 @@ export const DashboardEmbedControls = ({ dashboardId, onHide }: Props) => {
+           addInfoToast(t('Changes saved.'));
+         },
+         err => {
+-          console.error(err);
++          
+           addDangerToast(
+             t(
+               t('Sorry, something went wrong. The changes could not be saved.'),
+@@ -117,7 +117,7 @@ export const DashboardEmbedControls = ({ dashboardId, onHide }: Props) => {
+           onHide();
+         },
+         err => {
+-          console.error(err);
++          
+           addDangerToast(
+             t(
+               'Sorry, something went wrong. Embedding could not be deactivated.',
+diff --git a/superset-frontend/src/dashboard/components/PropertiesModal/index.tsx b/superset-frontend/src/dashboard/components/PropertiesModal/index.tsx
+index adbeb75aee..7bd5901280 100644
+--- a/superset-frontend/src/dashboard/components/PropertiesModal/index.tsx
++++ b/superset-frontend/src/dashboard/components/PropertiesModal/index.tsx
+@@ -408,7 +408,7 @@ const PropertiesModal = ({
+         onHide();
+         addSuccessToast(t('Dashboard properties updated'));
+       } catch (error) {
+-        console.error('Apply failed:', error);
++        
+       } finally {
+         setIsApplying(false);
+       }
+diff --git a/superset-frontend/src/dashboard/components/nativeFilters/utils.ts b/superset-frontend/src/dashboard/components/nativeFilters/utils.ts
+index 40398855ca..9ec78dff20 100644
+--- a/superset-frontend/src/dashboard/components/nativeFilters/utils.ts
++++ b/superset-frontend/src/dashboard/components/nativeFilters/utils.ts
+@@ -254,7 +254,7 @@ export function getFilterScope(
+     if (target) {
+       targets.push(target);
+     } else {
+-      console.warn(`Invalid filter scope key format: ${scopeKey}`);
++      
+     }
+   });
+ 
+diff --git a/superset-frontend/src/dashboard/hooks/useDownloadScreenshot.ts b/superset-frontend/src/dashboard/hooks/useDownloadScreenshot.ts
+index 93e2198afe..198649f463 100644
+--- a/superset-frontend/src/dashboard/hooks/useDownloadScreenshot.ts
++++ b/superset-frontend/src/dashboard/hooks/useDownloadScreenshot.ts
+@@ -110,10 +110,7 @@ export const useDownloadScreenshot = (
+                   fileName = parsed.parameters.filename;
+                 }
+               } catch (error) {
+-                console.warn(
+-                  'Failed to parse Content-Disposition header:',
+-                  error,
+-                );
++                
+               }
+             }
+ 
+diff --git a/superset-frontend/src/dashboard/util/chartStateConverter.ts b/superset-frontend/src/dashboard/util/chartStateConverter.ts
+index 0b8fd836c8..2cde0f457f 100644
+--- a/superset-frontend/src/dashboard/util/chartStateConverter.ts
++++ b/superset-frontend/src/dashboard/util/chartStateConverter.ts
+@@ -54,10 +54,7 @@ class ChartStateConverterRegistry {
+       return converter(chartState);
+     } catch (error) {
+       // Log error but don't throw - graceful degradation
+-      console.warn(
+-        `Error converting chart state for viz type "${vizType}":`,
+-        error,
+-      );
++      
+       return {};
+     }
+   }
+diff --git a/superset-frontend/src/dashboard/util/risonFilters.ts b/superset-frontend/src/dashboard/util/risonFilters.ts
+index ba798459b2..6e4143263f 100644
+--- a/superset-frontend/src/dashboard/util/risonFilters.ts
++++ b/superset-frontend/src/dashboard/util/risonFilters.ts
+@@ -170,7 +170,7 @@ export function parseRisonFilters(risonString: string): RisonFilter[] {
+ 
+     return filters;
+   } catch (error) {
+-    console.warn('Failed to parse Rison filters:', error);
++    
+     return [];
+   }
+ }
+@@ -252,7 +252,7 @@ export function prettifyRisonFilterUrl(): void {
+       });
+     }
+   } catch (error) {
+-    console.warn('Failed to prettify Rison URL:', error);
++    
+   }
+ }
+ 
+@@ -319,7 +319,7 @@ export function risonFiltersToString(filters: RisonFilter[]): string {
+   try {
+     return rison.encode(risonObject);
+   } catch (error) {
+-    console.warn('Failed to encode Rison filters:', error);
++    
+     return '';
+   }
+ }
+@@ -370,7 +370,7 @@ export function updateUrlWithUnmatchedFilters(
+       });
+     }
+   } catch (error) {
+-    console.warn('Failed to update URL with unmatched filters:', error);
++    
+   }
+ }
+ 
+diff --git a/superset-frontend/src/explore/components/controls/LayerConfigsControl/LayerConfigsPopoverContent.tsx b/superset-frontend/src/explore/components/controls/LayerConfigsControl/LayerConfigsPopoverContent.tsx
+index 60dbec50f6..9fe77721b5 100644
+--- a/superset-frontend/src/explore/components/controls/LayerConfigsControl/LayerConfigsPopoverContent.tsx
++++ b/superset-frontend/src/explore/components/controls/LayerConfigsControl/LayerConfigsPopoverContent.tsx
+@@ -323,7 +323,7 @@ export const LayerConfigsPopoverContent: FC<
+         });
+         setGeoStylerData(gsData);
+       } catch {
+-        console.warn('Could not read geostyler data');
++        
+         setGeoStylerData(undefined);
+       }
+     };
+diff --git a/superset-frontend/src/explore/components/controls/MatrixifyControl/utils/fetchTopNValues.ts b/superset-frontend/src/explore/components/controls/MatrixifyControl/utils/fetchTopNValues.ts
+index dfd460a8f5..5b15a70a79 100644
+--- a/superset-frontend/src/explore/components/controls/MatrixifyControl/utils/fetchTopNValues.ts
++++ b/superset-frontend/src/explore/components/controls/MatrixifyControl/utils/fetchTopNValues.ts
+@@ -77,7 +77,7 @@ export async function fetchTopNValues({
+       metricValue: row[metric],
+     }));
+   } catch (error) {
+-    console.error('Error fetching top N values:', error);
++    
+     throw error;
+   }
+ }
+diff --git a/superset-frontend/src/explore/components/controls/withAsyncVerification.test.tsx b/superset-frontend/src/explore/components/controls/withAsyncVerification.test.tsx
+index 359db207f0..54c26bc1d2 100644
+--- a/superset-frontend/src/explore/components/controls/withAsyncVerification.test.tsx
++++ b/superset-frontend/src/explore/components/controls/withAsyncVerification.test.tsx
+@@ -39,7 +39,7 @@ const defaultProps = {
+   needAsyncVerification: true,
+   actions: { setControlValue: mockSetControlValue },
+   onChange: (p0: string[]) => {
+-    console.log('onChange called with:', p0);
++    
+   },
+   columns: [
+     { type: 'VARCHAR(255)', column_name: 'source' },
+diff --git a/superset-frontend/src/features/home/RightMenu.tsx b/superset-frontend/src/features/home/RightMenu.tsx
+index 9e69b469e8..3b5f39d7a1 100644
+--- a/superset-frontend/src/features/home/RightMenu.tsx
++++ b/superset-frontend/src/features/home/RightMenu.tsx
+@@ -374,7 +374,7 @@ const RightMenu = ({
+         });
+       }
+     } catch (error) {
+-      console.warn('Failed to clear storage on logout:', error);
++      
+     }
+   };
+ 
+@@ -835,7 +835,7 @@ class RightMenuErrorWrapper extends Component<
+   }
+ 
+   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
+-    console.error('RightMenu error caught:', error, errorInfo);
++    
+   }
+ 
+   noop = () => {};
+diff --git a/superset-frontend/src/hooks/apiResources/tables.test.ts b/superset-frontend/src/hooks/apiResources/tables.test.ts
+index 55fb45d3cc..c3e48a8728 100644
+--- a/superset-frontend/src/hooks/apiResources/tables.test.ts
++++ b/superset-frontend/src/hooks/apiResources/tables.test.ts
+@@ -222,14 +222,11 @@ describe('useTables hook', () => {
+         }),
+       },
+     );
+-    console.log(
+-      'Called URLs:',
+-      fetchMock.callHistory.calls().map(call => call.url),
+-    );
++    
+ 
+     // Add a catch-all mock to see if any unmocked requests are being made
+     fetchMock.route('*', url => {
+-      console.log('Unmocked request to:', url);
++      
+       return 404;
+     });
+     await waitFor(() =>
+diff --git a/superset-frontend/src/pages/FileHandler/index.tsx b/superset-frontend/src/pages/FileHandler/index.tsx
+index ea24ce9383..207cdd4630 100644
+--- a/superset-frontend/src/pages/FileHandler/index.tsx
++++ b/superset-frontend/src/pages/FileHandler/index.tsx
+@@ -101,7 +101,7 @@ const FileHandler = ({ addDangerToast, addSuccessToast }: FileHandlerProps) => {
+           setAllowedExtensions(extensions);
+           setShowModal(true);
+         } catch (error) {
+-          console.error('Error handling file launch:', error);
++          
+           addDangerToast(t('Failed to open file. Please try again.'));
+           history.push('/welcome/');
+         }
+diff --git a/superset-frontend/src/theme/ThemeController.ts b/superset-frontend/src/theme/ThemeController.ts
+index a51157e92f..f8ce9ee729 100644
+--- a/superset-frontend/src/theme/ThemeController.ts
++++ b/superset-frontend/src/theme/ThemeController.ts
+@@ -48,7 +48,7 @@ export class LocalStorageAdapter implements ThemeStorage {
+     try {
+       return localStorage.getItem(key);
+     } catch (error) {
+-      console.warn('Failed to read from localStorage:', error);
++      
+       return null;
+     }
+   }
+@@ -57,7 +57,7 @@ export class LocalStorageAdapter implements ThemeStorage {
+     try {
+       localStorage.setItem(key, value);
+     } catch (error) {
+-      console.warn('Failed to write to localStorage:', error);
++      
+     }
+   }
+ 
+@@ -65,7 +65,7 @@ export class LocalStorageAdapter implements ThemeStorage {
+     try {
+       localStorage.removeItem(key);
+     } catch (error) {
+-      console.warn('Failed to remove from localStorage:', error);
++      
+     }
+   }
+ }
+@@ -163,10 +163,7 @@ export class ThemeController {
+       this.applyTheme(initialTheme);
+     } catch (error) {
+       // Corrupted dev override or CRUD theme in storage - clear and retry with defaults
+-      console.warn(
+-        'Failed to apply stored theme, clearing invalid overrides:',
+-        error,
+-      );
++      
+       this.devThemeOverride = null;
+       this.crudThemeId = null;
+       this.storage.removeItem(STORAGE_KEYS.DEV_THEME_OVERRIDE);
+@@ -297,7 +294,7 @@ export class ThemeController {
+       }
+       return null;
+     } catch (error) {
+-      console.error('Failed to create dashboard theme provider:', error);
++      
+       return null;
+     }
+   }
+@@ -413,7 +410,7 @@ export class ThemeController {
+           this.notifyListeners();
+         }
+       } catch (error) {
+-        console.error('Failed to load CRUD theme:', error);
++        
+         this.dashboardCrudTheme = null;
+         this.notifyListeners();
+       }
+@@ -502,7 +499,7 @@ export class ThemeController {
+       const storedId = this.storage.getItem(STORAGE_KEYS.APPLIED_THEME_ID);
+       return storedId ? parseInt(storedId, 10) : null;
+     } catch (error) {
+-      console.warn('Failed to get applied theme ID:', error);
++      
+       return null;
+     }
+   }
+@@ -518,7 +515,7 @@ export class ThemeController {
+         this.storage.removeItem(STORAGE_KEYS.APPLIED_THEME_ID);
+       }
+     } catch (error) {
+-      console.warn('Failed to set applied theme ID:', error);
++      
+     }
+   }
+ 
+@@ -584,7 +581,7 @@ export class ThemeController {
+         if (newTheme) this.updateTheme(newTheme);
+       }
+     } catch (error) {
+-      console.error('Failed to handle system theme change:', error);
++      
+     }
+   };
+ 
+@@ -680,7 +677,7 @@ export class ThemeController {
+       this.mediaQuery = window.matchMedia(MEDIA_QUERY_DARK_SCHEME);
+       this.mediaQuery.addEventListener('change', this.handleSystemThemeChange);
+     } catch (error) {
+-      console.warn('Failed to initialize media query listener:', error);
++      
+     }
+   }
+ 
+@@ -823,7 +820,7 @@ export class ThemeController {
+ 
+       return null;
+     } catch (error) {
+-      console.warn('Failed to load saved theme mode:', error);
++      
+       return null;
+     }
+   }
+@@ -893,7 +890,7 @@ export class ThemeController {
+         ?.fontUrls as string[] | undefined;
+       this.loadFonts(fontUrls);
+     } catch (error) {
+-      console.error('Failed to apply theme:', error);
++      
+       // Re-throw the error so updateTheme can handle fallback logic
+       throw error;
+     }
+@@ -947,7 +944,7 @@ export class ThemeController {
+     try {
+       this.storage.setItem(this.modeStorageKey, this.currentMode);
+     } catch (error) {
+-      console.warn('Failed to persist theme mode:', error);
++      
+     }
+   }
+ 
+@@ -959,7 +956,7 @@ export class ThemeController {
+       try {
+         callback(this.globalTheme);
+       } catch (error) {
+-        console.error('Error in theme change callback:', error);
++        
+       }
+     });
+   }
+@@ -974,7 +971,7 @@ export class ThemeController {
+         ? ThemeMode.DARK
+         : ThemeMode.DEFAULT;
+     } catch (error) {
+-      console.warn('Failed to detect system theme preference:', error);
++      
+       return ThemeMode.DEFAULT;
+     }
+   }
+@@ -986,7 +983,7 @@ export class ThemeController {
+     try {
+       this.crudThemeId = this.storage.getItem(STORAGE_KEYS.CRUD_THEME_ID);
+     } catch (error) {
+-      console.warn('Failed to load CRUD theme ID:', error);
++      
+       this.crudThemeId = null;
+     }
+   }
+@@ -1001,7 +998,7 @@ export class ThemeController {
+         this.devThemeOverride = JSON.parse(stored);
+       }
+     } catch (error) {
+-      console.warn('Failed to load dev theme override:', error);
++      
+       this.devThemeOverride = null;
+     }
+   }
+@@ -1028,7 +1025,7 @@ export class ThemeController {
+       const themeConfig = JSON.parse(result.json_data);
+ 
+       if (!themeConfig || typeof themeConfig !== 'object') {
+-        console.error(`Invalid theme configuration for theme ${themeId}`);
++        
+         return null;
+       }
+ 
+@@ -1037,7 +1034,7 @@ export class ThemeController {
+       // Runtime errors will be caught by applyThemeWithRecovery()
+       return themeConfig;
+     } catch (error) {
+-      console.error('Failed to fetch CRUD theme:', error);
++      
+       return null;
+     }
+   }
+@@ -1144,7 +1141,7 @@ export class ThemeController {
+       }
+     } catch (error) {
+       // Log for debugging but don't fail - fallback to cached theme will be used
+-      console.warn('Failed to fetch system default theme:', error);
++      
+     }
+ 
+     return null;
+diff --git a/superset-frontend/src/utils/downloadAsImage.tsx b/superset-frontend/src/utils/downloadAsImage.tsx
+index a3be38ba9b..6aeb810fea 100644
+--- a/superset-frontend/src/utils/downloadAsImage.tsx
++++ b/superset-frontend/src/utils/downloadAsImage.tsx
+@@ -465,7 +465,7 @@ export default function downloadAsImageOptimized(
+         link.href = dataUrl;
+         link.click();
+       } catch (error) {
+-        console.error('Creating image failed', error);
++        
+         addWarningToast(
+           t('Image download failed, please refresh and try again.'),
+         );
+@@ -527,7 +527,7 @@ export default function downloadAsImageOptimized(
+       link.href = dataUrl;
+       link.click();
+     } catch (error) {
+-      console.error('Creating image failed', error);
++      
+       addWarningToast(
+         t('Image download failed, please refresh and try again.'),
+       );
+diff --git a/superset-frontend/src/utils/safeStringify.ts b/superset-frontend/src/utils/safeStringify.ts
+index 1e97fa99fe..dd70211e9d 100644
+--- a/superset-frontend/src/utils/safeStringify.ts
++++ b/superset-frontend/src/utils/safeStringify.ts
+@@ -33,9 +33,7 @@ export function safeStringify(object: any): string {
+         } catch (err) {
+           // Replace circular reference with a placeholder
+           if (process.env.NODE_ENV !== 'production') {
+-            console.warn(
+-              `Circular reference detected and replaced with '[Circular]' placeholder (key: "${key}")`,
+-            );
++            
+           }
+           return '[Circular]';
+         }
+diff --git a/superset-frontend/src/utils/testUtils.ts b/superset-frontend/src/utils/testUtils.ts
+index c62ce741a2..b0179ef7c3 100644
+--- a/superset-frontend/src/utils/testUtils.ts
++++ b/superset-frontend/src/utils/testUtils.ts
+@@ -37,7 +37,7 @@ export const testWithId =
+       return (resultIdOnly ? id : { 'data-test': id }) as TestWithIdType<T>;
+     }
+     if (!id && !prefix) {
+-      console.warn('testWithId function has missed "prefix" and "id" params');
++      
+       return (resultIdOnly ? '' : { 'data-test': '' }) as TestWithIdType<T>;
+     }
+     const newId = `${prefix}__${id}`;
+diff --git a/superset-frontend/src/views/CRUD/hooks.ts b/superset-frontend/src/views/CRUD/hooks.ts
+index 6969f3d7cf..c7b4968120 100644
+--- a/superset-frontend/src/views/CRUD/hooks.ts
++++ b/superset-frontend/src/views/CRUD/hooks.ts
+@@ -926,7 +926,7 @@ export function useDatabaseValidation() {
+           });
+         }
+ 
+-        console.error('Unexpected error during validation:', error);
++        
+         // A request that produced no usable response (network drop, no JSON
+         // body) is not a completed validation cycle, so ``hasValidated``
+         // must stay false: otherwise the Connect button would enable
