@@ -80,7 +80,7 @@ python ratchet/detector/upstream_metric.py --refresh
 
 ---
 
-## Quickstart
+## Run it yourself
 
 **Start here.** No API key, no credentials, no setup beyond the clone:
 
@@ -94,7 +94,7 @@ docker compose run --rm simulate
 no environment: the fixtures are baked into the image, so it behaves identically
 on any machine. Runtime is about a minute; `-e FAST=1` skips the pacing.
 
-Simulate replays all five sessions below, narrating the orchestrator's real
+Simulate replays all five real sessions, narrating the orchestrator's real
 decision sequence: detect → file → launch → Devin works → structured report →
 independent verification → human merges. The fixtures in `ratchet/fixtures/` are
 **recorded API responses and message streams from those actual runs**, not
@@ -116,6 +116,73 @@ page falls back to `ratchet/fixtures/ledger.json` — the committed record of th
 real runs — and labels itself **recorded results** while it does. Once the
 orchestrator has run for real, the same page reads live from SQLite and the
 label disappears. JSON at `/metrics.json`.
+
+### File issues yourself — and see exactly what would happen first
+
+The detector is the event source. Running it needs a checkout of the repository
+under measurement and a `gh` login, but **no Devin key and no spend** — it only
+reads the tree and writes issues.
+
+```bash
+git clone https://github.com/CognitionTakeHomeOrg/superset-adham-clone
+cd superset-adham-clone/superset-frontend && npm ci && cd ../..
+
+python ratchet/detector/detect.py --workstream C        # dry run, nothing written
+```
+
+```
+gate=oxlint rule=react/jsx-key  findings=77  units=5
+  C1   plugins/plugin-chart-echarts          36 findings  16 files  fp=9eebe8ba1fe2  -> create new
+  C2   src/explore                           18 findings   5 files  fp=7ff60ee15b59  -> create new
+  C3   src/dashboard                          7 findings   5 files  fp=eb7e0e1e7083  -> create new
+  C4   packages/superset-ui-chart-controls    6 findings   3 files  fp=de1707890c50  -> create new
+  C6   misc                                  10 findings   5 files  fp=0c0b7f28ca7d  -> create new
+
+(dry run -- would create 5 and update 0. Pass --apply to do it.)
+```
+
+**The dry run resolves the create-or-update decision for real.** It queries the
+open issues and matches each unit's fingerprint against them using the *same*
+lookup that `--apply` uses — so the preview is the decision, not a description of
+it. Run it against a workstream that has already been filed and you can watch
+idempotency work rather than take it on trust:
+
+```bash
+python ratchet/detector/detect.py --workstream B
+#   B2   src/components   18 findings   6 files  fp=772b48573da8  -> update #8
+#   (dry run -- would create 6 and update 1. Pass --apply to do it.)
+```
+
+`B2` resolves to the issue that already exists. Nothing else in that workstream
+does, so a second run edits one issue and files the rest — never a duplicate.
+
+Then, when the preview says what you want:
+
+```bash
+python ratchet/detector/detect.py --workstream C --apply                    # file them
+python ratchet/detector/detect.py --workstream C --apply --only-area misc   # or just one
+```
+
+Every issue it writes carries `<!-- ratchet-fingerprint: … -->`, which is how the
+next run finds it again. Workstreams are `A` `B` `C` `D` `E` `G` — see the table
+under *The problem*.
+
+`E` is the mypy gate and needs no npm install, but it does need the isolated
+environment the gate is defined by — mypy plus ten stub packages and **nothing
+else**. It refuses to run otherwise rather than answer a different question
+(Trap 1, below):
+
+```bash
+python -m venv .mypy-gate
+.mypy-gate/bin/pip install "mypy==1.15.0" \
+  types-cachetools types-simplejson types-python-dateutil types-requests \
+  types-pytz types-croniter types-PyYAML types-setuptools types-paramiko \
+  types-Markdown
+```
+
+> The detector refuses to measure a dirty working tree. Every number here is a
+> delta against a committed baseline, so uncommitted edits would not produce a
+> wrong number — they would produce a fabricated one.
 
 ### The full system
 
@@ -139,35 +206,6 @@ docker compose up
 The checkout must exist before `up`: Docker cannot bind-mount a path that is not
 there. Set `FORK_PATH` if you keep it somewhere else. This is the only step that
 spends money — the budget controls are enforced before any session is created.
-
----
-
-## What it did
-
-Against [`CognitionTakeHomeOrg/superset-adham-clone`](https://github.com/CognitionTakeHomeOrg/superset-adham-clone), pinned to `9f5611aca5`. Every issue was filed by the detector, every pull request opened by a Devin session, every one verified independently before a human merged it.
-
-| Issue | Gate | Unit | PR | Findings | Result |
-|---|---|---|---|---|---|
-| #1 | `react/jsx-key` | `src/components` | #2 | 4 | 81 → **77** · merged |
-| #3 | `react-hooks/rules-of-hooks` | `src/pages` | #4 | 15 | 47 → **32** · merged |
-| #5 | mypy `unused-ignore` | `superset/semantic_layers` | #6 | 6 | 49 → **43** · merged |
-| #8 | `react/no-unstable-nested-components` | `src/dashboard` | #11 | 18 | 150 → **132** · verified, open |
-| #9 | `react/prefer-function-component` | `misc` | #10 | 1 of 2 | **escalated**, open |
-
-**44 findings across five gates and two languages**, zero suppressions added, one
-escalation. PR #7 is the ratchet. The three open pull requests are left open on
-purpose: a verified PR waiting on a human is the state this design intends, and
-merging them to make a table look tidier would misrepresent it.
-
-Three results worth more than the counts:
-
-**PR #4 fixed 15 findings in one file** because one early `return` sat above 15 hook calls — a feature flag that changed how many hooks React saw between renders. It was fixed by splitting the component, not by deleting hooks: the file *grew* from 661 to 675 lines and every hook survived.
-
-**PR #2 found a crash nobody asked about.** Clearing `jsx-key` in `TimeoutErrorMessage` meant rewriting a `.map().reduce()` — and `reduce` on an empty array with no initial value throws. The component had been crashing whenever its error list was empty. The session reported `behavior_change: true` rather than shipping it silently, and the orchestrator routed it to `needs:human-review`, because a linter cannot tell you whether changed behaviour is *wanted*.
-
-**PR #10 is the escalation, and it is the result I would defend hardest.** Asked to convert two class components, the session converted one and refused the other: react-dnd's legacy `DragSource`/`DropTarget` hand the class *instance* to the hover and drop specs, and four other files read `component.mounted|ref|props|setState` off it. Converting it would have **passed the linter and silently broken drag-and-drop on every dashboard**. It found the fix that satisfies every automated check and makes the product worse, and declined to make it — then volunteered the number that made its own run look worse (*"check 2 printed 1, not 0"*). That string lands in `blocked_reason`, the one field in the output schema that is optional, and the orchestrator turns it into `status:escalated` and a human decision rather than a retry.
-
----
 
 ## How it works
 

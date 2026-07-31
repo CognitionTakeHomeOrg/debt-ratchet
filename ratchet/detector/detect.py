@@ -107,10 +107,19 @@ def main() -> int:
               f"in tests/stories, not filed)")
     units = group(findings, args.workstream)
 
+    # Resolve the create/update decision BEFORE branching on --apply, so a dry
+    # run reports the action it would take rather than merely listing units.
+    # "Trust me, it is idempotent" is not something a reviewer should have to
+    # accept: the same lookup that drives --apply drives the preview, so the
+    # only way the preview can lie is if the issue set changes in between.
+    known = existing_issues(repo)
+
     print(f"gate={gate} rule={rule}  findings={len(findings)}  units={len(units)}")
     for u in units:
+        hit = known.get(u.fingerprint)
+        action = f"update #{hit['number']}" if hit else "create new"
         print(f"  {u.ident:4} {u.area:45} {len(u.findings):3} findings  "
-              f"{len(u.files):2} files  fp={u.fingerprint}")
+              f"{len(u.files):2} files  fp={u.fingerprint}  -> {action}")
 
     if args.only_area:
         units = [u for u in units if u.area == args.only_area]
@@ -119,10 +128,11 @@ def main() -> int:
             return 1
 
     if not args.apply:
-        print("\n(dry run -- pass --apply to file issues)")
+        creates = sum(1 for u in units if u.fingerprint not in known)
+        print(f"\n(dry run -- would create {creates} and update "
+              f"{len(units) - creates}. Pass --apply to do it.)")
         return 0
 
-    known = existing_issues(repo)
     for u in units:
         title, body = render(u, repo, sha)
         labels = [GATE_LABEL[u.gate], "devin:queued"]
