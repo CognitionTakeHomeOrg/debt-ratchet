@@ -94,10 +94,12 @@ docker compose up
 ### No API key? Run it anyway
 
 ```bash
-docker compose --profile simulate up
+docker compose run --rm simulate
 ```
 
-**Start here if you are evaluating this.** Simulate mode replays the three sessions that produced the three merged pull requests below, narrating the orchestrator's real decision sequence: detect → file → launch → Devin works → structured report → independent verification → human merges.
+**Start here if you are evaluating this.** `run` rather than `up`, so only this
+service starts — the orchestrator and dashboard are not brought up, and no
+credentials are needed or read. Simulate mode replays the three sessions that produced the three merged pull requests below, narrating the orchestrator's real decision sequence: detect → file → launch → Devin works → structured report → independent verification → human merges.
 
 The fixtures in `ratchet/fixtures/` are **recorded API responses and message streams from those actual runs** — not synthetic data. No credentials are read: `simulate.py` refuses to touch a credential even if one is present in the environment.
 
