@@ -1,0 +1,104 @@
+# The trigger.
+#
+# This is what makes the system event-driven rather than a script someone runs.
+# Nobody decides what Devin works on: the gates are measured on a schedule, and
+# any debt they find becomes a GitHub issue. Issue creation is then the event the
+# orchestrator reacts to.
+#
+# Safe to run on a cron because the detector is idempotent -- each unit carries a
+# fingerprint hashed from (rule, area), deliberately not from line numbers or
+# counts, so a second run edits the existing issue instead of filing a duplicate.
+name: detect
+
+on:
+  schedule:
+    # 06:00 UTC daily. Findings that appear overnight are filed before standup.
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+    inputs:
+      workstream:
+        description: "A=rules-of-hooks B=unstable-components C=jsx-key D=ban-ts-comment E=mypy"
+        required: true
+        default: "C"
+        type: choice
+        options: ["A", "B", "C", "D", "E"]
+      apply:
+        description: "File issues (unchecked = dry run)"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    strategy:
+      # One job per gate, and never cancel siblings: a failure in the mypy gate
+      # should not silence the oxlint ones.
+      fail-fast: false
+      matrix:
+        workstream: ${{ github.event_name == 'workflow_dispatch' && fromJSON(format('["{0}"]', inputs.workstream)) || fromJSON('["A","C","D","E"]') }}
+    steps:
+      - name: check out the automation
+        uses: actions/checkout@v4
+
+      - name: check out the repository under measurement
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.FORK_REPO }}
+          ref: ${{ vars.BASELINE_SHA }}
+          path: superset-adham-clone
+          token: ${{ secrets.RATCHET_GITHUB_TOKEN }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: superset-adham-clone/superset-frontend/.nvmrc
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: install frontend deps
+        if: matrix.workstream != 'E'
+        working-directory: superset-adham-clone/superset-frontend
+        # `npm ci` honours the lockfile. Trap 2: the pinned oxlint binary is what
+        # CI uses, and `npx` may resolve a different version and a different count.
+        run: npm ci --prefer-offline --no-audit
+
+      - name: install the mypy gate
+        if: matrix.workstream == 'E'
+        # Trap 1: stub packages only. Installing Superset's real dependencies
+        # makes the same command on the same commit report 1,500+ errors that
+        # have nothing to do with the gate. Both numbers are real; only this one
+        # is what pre-commit runs.
+        run: |
+          python -m venv .mypy-gate
+          .mypy-gate/bin/pip install --quiet "mypy==1.15.0" \
+            types-cachetools types-simplejson types-python-dateutil types-requests \
+            types-pytz types-croniter types-PyYAML types-setuptools types-paramiko \
+            types-Markdown
+
+      - name: run the gate and file issues
+        env:
+          GH_TOKEN: ${{ secrets.RATCHET_GITHUB_TOKEN }}
+          FORK_REPO: ${{ vars.FORK_REPO }}
+          BASELINE_SHA: ${{ vars.BASELINE_SHA }}
+        run: |
+          python ratchet/detector/detect.py \
+            --workstream "${{ matrix.workstream }}" \
+            ${{ (github.event_name == 'schedule' || inputs.apply) && '--apply' || '' }}
+
+      - name: keep the ratchet current
+        # The ratchet PR is opened and updated by the system, on every gate
+        # improvement. Leaving it manual would reintroduce the exact failure this
+        # project exists to attack: work that decays because it depends on
+        # someone remembering. Merging it stays a human decision.
+        if: github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ secrets.RATCHET_GITHUB_TOKEN }}
+          FORK_REPO: ${{ vars.FORK_REPO }}
+          BASELINE_SHA: ${{ vars.BASELINE_SHA }}
+        run: python ratchet/orchestrator/ratchet.py --auto --push || true

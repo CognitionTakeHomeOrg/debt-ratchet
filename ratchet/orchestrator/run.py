@@ -285,6 +285,49 @@ def poll(args, root: Path, env: dict, con) -> int:
     return 0
 
 
+def _verify_and_report(con, env, row, pr_url: str) -> None:
+    """Run the independent verifier and post its verdict on the pull request.
+
+    Left manual, this was the weakest link in the whole system: the orchestrator
+    marked a session `verifying` and then waited for a person to remember to run
+    the checks. A verification step that depends on someone remembering is not a
+    control, which is the same argument that made the ratchet PR automatic.
+
+    The verdict goes on the PR rather than into a log, because the PR is where
+    the human decision actually happens. Merging stays theirs -- this makes the
+    evidence unavoidable, not the decision.
+    """
+    number = pr_url.rstrip("/").rsplit("/", 1)[-1]
+    print(f"  -> verifying PR #{number} ...")
+    r = subprocess.run(
+        [sys.executable, str(Path(__file__).parent / "verify.py"), "--pr", number],
+        capture_output=True, text=True,
+    )
+    report = (r.stdout or r.stderr).strip()
+    passed = r.returncode == 0
+
+    tail = "\n".join(report.splitlines()[-25:])
+    verdict = "✅ **Independent verification passed**" if passed else \
+              "❌ **Independent verification FAILED**"
+    body = (
+        f"{verdict}\n\n"
+        f"Re-run in a clean worktree with the lockfile-pinned toolchain — not the "
+        f"session's own environment, and not its self-report.\n\n"
+        f"```\n{tail}\n```\n\n"
+        + ("Ready for human review. **This does not merge anything.**"
+           if passed else
+           "Do not merge. The gate may be green while the defect survives — that "
+           "is exactly what these checks exist to catch.")
+    )
+    subprocess.run(
+        ["gh", "pr", "comment", number, "--repo", env["FORK_REPO"], "--body", body],
+        capture_output=True,
+    )
+    state.update(con, row["session_id"],
+                 status="pr_open" if passed else "failed")
+    print(f"  -> verification {'PASS' if passed else 'FAIL'}, posted to PR #{number}")
+
+
 def _settle(con, env, row, st, pr, so) -> None:
     repo = env["FORK_REPO"]
     if st == "blocked":
@@ -306,7 +349,9 @@ def _settle(con, env, row, st, pr, so) -> None:
         # Deliberately NOT 'merged'. The session claims it is done; verify.py has
         # to reproduce that claim in our own container before anything is trusted.
         state.update(con, row["session_id"], status="verifying")
-        print(f"  -> finished, awaiting independent verification")
+        print(f"  -> finished, running independent verification")
+        if pr:
+            _verify_and_report(con, env, row, pr)
 
         # A declared behaviour change is not a failure -- the prompt asks for it
         # to be declared rather than hidden, and here it caught a latent crash:
