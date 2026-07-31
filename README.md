@@ -156,16 +156,48 @@ python ratchet/detector/detect.py --workstream B
 `B2` resolves to the issue that already exists. Nothing else in that workstream
 does, so a second run edits one issue and files the rest — never a duplicate.
 
-Then, when the preview says what you want:
+### File one issue
+
+`--only-area` narrows a run to a single unit. Preview it, then repeat the command
+with `--apply`:
 
 ```bash
-python ratchet/detector/detect.py --workstream C --apply                    # file them
-python ratchet/detector/detect.py --workstream C --apply --only-area misc   # or just one
+python ratchet/detector/detect.py --workstream C --only-area packages/superset-ui-chart-controls
+#   ... -> create new
+#   (dry run -- would create 1 and update 0. Pass --apply to do it.)
+
+python ratchet/detector/detect.py --workstream C --only-area packages/superset-ui-chart-controls --apply
+#   created https://github.com/.../issues/N
 ```
 
-Every issue it writes carries `<!-- ratchet-fingerprint: … -->`, which is how the
-next run finds it again. Workstreams are `A` `B` `C` `D` `E` `G` — see the table
-under *The problem*.
+**Whatever the arrow says is what `--apply` will do** — the areas listed above
+already carry issues in this repository, so run the preview first and pick one
+that still says `create new`. Or file the whole workstream:
+
+```bash
+python ratchet/detector/detect.py --workstream C --apply
+```
+
+Two workstreams are worth knowing about:
+
+- **`G` is one unit by nature.** Only two `prefer-function-component` findings
+  exist in the repository, so it can never produce more than one issue.
+- **`E`** is the mypy gate — see the environment note below.
+
+### Watch idempotency instead of trusting it
+
+Every issue carries `<!-- ratchet-fingerprint: … -->`, and re-running resolves
+against it. `src/dashboard` was filed as issue #13 by exactly the command above,
+so the same command now previews an update rather than a duplicate:
+
+```bash
+python ratchet/detector/detect.py --workstream C --only-area src/dashboard
+#   C3   src/dashboard   7 findings   5 files  fp=eb7e0e1e7083  -> update #13
+#   (dry run -- would create 0 and update 1. Pass --apply to do it.)
+```
+
+That is the property the nightly schedule depends on. Workstreams are
+`A` `B` `C` `D` `E` `G`; see the table under *The problem*.
 
 `E` is the mypy gate and needs no npm install, but it does need the isolated
 environment the gate is defined by — mypy plus ten stub packages and **nothing
