@@ -18,4 +18,9 @@ __pycache__/
 .venv/
 node_modules/
 ratchet/state.db
+# WAL/SHM sidecars -- journal_mode=WAL creates these next to the ledger, and
+# they carry the same runtime state the .db does.
+ratchet/state.db-wal
+ratchet/state.db-shm
+ratchet/.tunnel.log
 .mypy-gate/
