@@ -51,9 +51,9 @@ version than the lockfile and give you a different answer than CI.
 ```bash
 cd superset-frontend
 
-# 1. This area is clean.
+# 1. Every file in this task is clean.
 ./node_modules/.bin/oxlint --config oxlint.json -A all -D {rule} --format json \\
-  | jq '[.diagnostics[] | select(.filename | startswith("{area}/"))] | length'
+  | jq '[.diagnostics[] | select({scope_filter})] | length'
 # must print 0
 
 # 2. Nothing else regressed. The repo-wide count for this rule must be exactly
@@ -178,7 +178,7 @@ GATE_INI
 
 # 1. No dead ignores remain in {area}.
 /tmp/mypy-gate/bin/mypy --config-file /tmp/gate.ini --check-untyped-defs superset/ \\
-  2>&1 | grep '\\[unused-ignore\\]' | grep '^{area}' | wc -l
+  2>&1 | grep '\\[unused-ignore\\]' | grep -E '{mypy_scope}' | wc -l
 # must print 0
 
 # 2. Nothing else regressed. Repo-wide unused-ignore count must be exactly
@@ -237,8 +237,12 @@ def build_mypy(*, repo: str, sha: str, area: str, findings: list, before: int,
                          for f in sorted(by_file[path], key=lambda f: f.line))
         blocks.append(f"`{path}`\n{rows}")
 
+    # Same trap as the oxlint side: `^misc` matches no path, so the scoped check
+    # would pass without testing anything. Anchor on the real files instead.
+    mypy_scope = ("^(" + "|".join(sorted(by_file)) + ")") if area == "misc" else f"^{area}"
+
     return MYPY_TEMPLATE.format(
-        repo=repo, sha=sha, area=area, n=len(findings),
+        repo=repo, sha=sha, area=area, n=len(findings), mypy_scope=mypy_scope,
         area_module=area.replace("/", "."),
         findings="\n\n".join(blocks),
         before=before, after=before - len(findings),
@@ -266,6 +270,19 @@ def build(*, repo: str, sha: str, rule: str, area: str, findings: list, before: 
     # Jest is run from superset-frontend/, so strip that prefix off the paths.
     targets = " ".join(sorted({p.split("/", 1)[1] for p in by_file}))
 
+    # A path prefix is the right scope for a real area, and *meaningless* for the
+    # `misc` bucket -- there is no `misc/` directory, so `startswith("misc/")`
+    # matches nothing and check 1 passes without testing anything. G1 reported
+    # `gate_closed: true` having fixed 1 of 2 findings for exactly this reason,
+    # and it was not wrong: the check it was handed was vacuous. Enumerate the
+    # files instead.
+    rel_files = sorted(p.split("/", 1)[1] for p in by_file)
+    if area == "misc":
+        listed = ",".join(f'"{f}"' for f in rel_files)
+        scope_filter = f".filename | IN({listed})"
+    else:
+        scope_filter = f'.filename | startswith("{area}/")'
+
     return TEMPLATE.format(
         repo=repo,
         sha=sha,
@@ -278,4 +295,5 @@ def build(*, repo: str, sha: str, rule: str, area: str, findings: list, before: 
         after=before - len(findings),
         test_targets=targets,
         antipatterns=anti_md,
+        scope_filter=scope_filter,
     )

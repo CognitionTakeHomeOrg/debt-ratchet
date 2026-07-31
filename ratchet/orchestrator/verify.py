@@ -64,6 +64,7 @@ RULE_BASELINE = {
     "react/jsx-key": 81,
     "@typescript-eslint/ban-ts-comment": 197,
     "unused-ignore": 49,
+    "react/prefer-function-component": 2,
 }
 
 MYPY_RULES = {"unused-ignore"}
@@ -90,7 +91,19 @@ def rule_for_pr(root: Path, pr_number: int, branch: str) -> tuple[str, int]:
         (f"%/pull/{pr_number}",),
     ).fetchone()
     if row:
-        return row["rule"], RULE_BASELINE[row["rule"]]
+        rule = row["rule"]
+        if rule not in RULE_BASELINE:
+            # A new workstream whose baseline was never registered here. Fail
+            # loudly and by name: the alternative was a KeyError inside the
+            # orchestrator's subprocess call, which surfaced on the pull request
+            # as a bare "verification FAILED" with no checks under it -- a
+            # verdict that looked like a judgement on the code and was actually
+            # a crash in the judge.
+            raise SystemExit(
+                f"no committed baseline for rule {rule!r}. Add it to "
+                f"RULE_BASELINE before verifying this workstream."
+            )
+        return rule, RULE_BASELINE[rule]
     raise SystemExit(
         f"no session recorded for PR #{pr_number} (branch {branch}); refusing to "
         f"guess which rule it closes"
@@ -98,20 +111,37 @@ def rule_for_pr(root: Path, pr_number: int, branch: str) -> tuple[str, int]:
 
 
 class Verdict:
+    """PASS / FAIL / N-A.
+
+    The third state exists because a check can fail for reasons that have nothing
+    to do with the pull request. `npm run plugins:build` fails inside the
+    verification worktree with TS2742 -- TypeScript resolves the mirrored
+    `node_modules` symlinks back to their real location in the source clone and
+    cannot emit a portable type name. It fails identically on untouched master.
+
+    Reporting that as FAIL blames the contributor for the harness, which is the
+    single most corrosive thing a verifier can do: it makes every genuine FAIL
+    easier to dismiss. Anything proven pre-existing is recorded, shown, and
+    excluded from the verdict.
+    """
+
     def __init__(self):
-        self.checks: list[tuple[str, bool, str]] = []
+        self.checks: list[tuple[str, bool | None, str]] = []
 
     def add(self, name: str, ok: bool, detail: str = "") -> None:
         self.checks.append((name, ok, detail))
 
+    def na(self, name: str, detail: str) -> None:
+        self.checks.append((name, None, detail))
+
     @property
     def passed(self) -> bool:
-        return all(ok for _, ok, _ in self.checks)
+        return all(ok for _, ok, _ in self.checks if ok is not None)
 
     def report(self) -> str:
         lines = []
         for name, ok, detail in self.checks:
-            mark = "PASS" if ok else "FAIL"
+            mark = "N/A " if ok is None else ("PASS" if ok else "FAIL")
             lines.append(f"  [{mark}] {name}" + (f" -- {detail}" if detail else ""))
         lines.append(f"\n  VERDICT: {'PASS' if self.passed else 'FAIL'}")
         return "\n".join(lines)
@@ -403,14 +433,38 @@ def main() -> int:
     # master -- so a naive type check here would report failure for every PR
     # including correct ones. When the PR touches packages/ or plugins/ we cannot
     # share the prebuilt output, so we pay for the rebuild.
+    def against_base(name: str, cmd: list[str], failed_out: str) -> None:
+        """Re-run a failing command on the base ref before blaming the PR.
+
+        This is the same discipline the sessions are held to -- one of them
+        reported 'npm run type fails identically on base' rather than claiming
+        success. A verifier that does not apply its own standard to itself has
+        no business issuing verdicts.
+        """
+        print(f"  {name} failed -- re-running on {pr['baseRefName']} to check "
+              f"whether it is pre-existing ...")
+        sh(["git", "checkout", "-q", "--detach", f"origin/{pr['baseRefName']}"], wt)
+        base = sh(cmd, fe)
+        sh(["git", "checkout", "-q", "--detach", pr["headRefOid"]], wt)
+        if base.returncode != 0:
+            v.na(name, "fails identically on base -- pre-existing, not this PR")
+        else:
+            v.add(name, False, failed_out)
+
     if touches_pkg:
         build = sh(["npm", "run", "plugins:build"], fe)
-        v.add("packages build", build.returncode == 0,
-              (build.stdout + build.stderr)[-200:] if build.returncode else "")
+        if build.returncode == 0:
+            v.add("packages build", True)
+        else:
+            against_base("packages build", ["npm", "run", "plugins:build"],
+                         (build.stdout + build.stderr).strip()[-200:])
 
     tsc = sh(["npm", "run", "type"], fe)
-    v.add("type-check passes", tsc.returncode == 0,
-          (tsc.stdout + tsc.stderr).strip()[-300:] if tsc.returncode else "")
+    if tsc.returncode == 0:
+        v.add("type-check passes", True)
+    else:
+        against_base("type-check passes", ["npm", "run", "type"],
+                     (tsc.stdout + tsc.stderr).strip()[-300:])
 
     tests, uncovered = test_files_for(changed, wt)
     if tests:

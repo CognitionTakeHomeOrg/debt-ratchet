@@ -343,9 +343,9 @@ def _verify_and_report(con, env, row, pr_url: str, partial: bool = False) -> Non
     if partial:
         verdict = "⚠️ **Partial fix — verified, gate still open**"
         closing = (
-            "The session reported `gate_closed: false` and said why. The work it "
-            "*did* do is checked above; the remaining findings are untouched and "
-            "the issue stays open.\n\n"
+            "The session named something it could not do (`blocked_reason`) and "
+            "explained why. The work it *did* do is checked above; the remaining "
+            "findings are untouched and the issue stays open.\n\n"
             "**This is a wanted outcome, not a failure.** A fix that closed the "
             "gate by doing the risky part badly would have passed the linter and "
             "broken behaviour. Review the rationale on the issue before merging."
@@ -407,7 +407,18 @@ def _settle(con, env, row, st, pr, so) -> None:
         # genuinely still open. Stamping "failed" on a correct partial fix would
         # punish the behaviour the whole system is built to encourage, and would
         # teach a reviewer to distrust the label.
-        partial = (so or {}).get("gate_closed") is False and bool(pr)
+        # Keyed on `blocked_reason`, not on `gate_closed`.
+        #
+        # G1 fixed 1 of 2 findings and still returned `gate_closed: true`, which
+        # was defensible: the verification command it was given was scoped to the
+        # unit's area, and for a `misc` bucket that prefix matches nothing, so
+        # check 1 printed 0 vacuously. The honest signal was in `blocked_reason`,
+        # which it filled in unprompted with the react-dnd explanation.
+        #
+        # A session that names something it could not do has not fully succeeded,
+        # whatever it says about the gate.
+        so = so or {}
+        partial = bool(so.get("blocked_reason")) and bool(pr)
         state.update(con, row["session_id"], status="verifying")
         print("  -> finished" + (" (PARTIAL -- gate not closed, by its own report)"
                                  if partial else ", running independent verification"))
