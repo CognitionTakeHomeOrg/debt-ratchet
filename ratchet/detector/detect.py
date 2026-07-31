@@ -36,6 +36,15 @@ WORKSTREAM_RULES = {
     "C": ("oxlint", "react/jsx-key"),
     "D": ("oxlint", "@typescript-eslint/ban-ts-comment"),
     "E": ("mypy", "unused-ignore"),
+    # G is the gate Superset says it wants closed. oxlint.json:168-171 --
+    # "Disabled because the codebase still contains legacy class components;
+    # flip to 'error' once the class-to-function migration completes." That
+    # migration is now all but finished: 5 class components remain across 4
+    # files, one of which (ErrorBoundary) must stay a class because React has no
+    # hook equivalent for componentDidCatch. The condition on their own TODO is
+    # nearly met and nobody has noticed, because the metric that tracked it was
+    # dropped when they migrated from ESLint to oxlint.
+    "G": ("oxlint", "react/prefer-function-component"),
 }
 
 # Workstreams whose findings in test fixtures are usually legitimate rather than

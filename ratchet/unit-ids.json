@@ -3,6 +3,10 @@
     "area": "src/filters",
     "ident": "D2"
   },
+  "0712693ae694": {
+    "area": "packages/superset-ui-core",
+    "ident": "B3"
+  },
   "0c0b7f28ca7d": {
     "area": "misc",
     "ident": "C6"
@@ -23,6 +27,14 @@
     "area": "src/components",
     "ident": "D8"
   },
+  "2e7bdae4b9df": {
+    "area": "src/explore",
+    "ident": "B5"
+  },
+  "31e4db1fadfe": {
+    "area": "misc",
+    "ident": "B7"
+  },
   "321d91521774": {
     "area": "packages/superset-ui-core",
     "ident": "D1"
@@ -39,6 +51,14 @@
     "area": "src/dashboard",
     "ident": "D6"
   },
+  "4e9f90a2b789": {
+    "area": "src/features",
+    "ident": "B6"
+  },
+  "51f4b3fe8c7d": {
+    "area": "misc",
+    "ident": "G1"
+  },
   "5360f2eb9fd1": {
     "area": "src/pages",
     "ident": "A1"
@@ -46,6 +66,14 @@
   "5740d1712cfc": {
     "area": "src/components",
     "ident": "C5"
+  },
+  "57b4f9ba2dc2": {
+    "area": "src/pages",
+    "ident": "B1"
+  },
+  "5b35be1dfcd8": {
+    "area": "src/dashboard",
+    "ident": "B4"
   },
   "6cbe8b9f3a1c": {
     "area": "src/features",
@@ -58,6 +86,10 @@
   "71ee5cd350c7": {
     "area": "plugins/plugin-chart-table",
     "ident": "A4"
+  },
+  "772b48573da8": {
+    "area": "src/components",
+    "ident": "B2"
   },
   "7ff60ee15b59": {
     "area": "src/explore",

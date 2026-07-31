@@ -29,6 +29,7 @@ WORKSTREAM_RULES = {
     "B": "react/no-unstable-nested-components",
     "C": "react/jsx-key",
     "D": "@typescript-eslint/ban-ts-comment",
+    "G": "react/prefer-function-component",
     "E": "unused-ignore",
 }
 MYPY_WORKSTREAMS = {"E"}

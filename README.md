@@ -39,6 +39,43 @@ The `zizmor` config states the deadlock outright:
 
 Too much debt to turn the gate on. No gate, so more debt accumulates.
 
+### This is not an outside opinion — it is written in the repository
+
+Three of these switches carry a maintainer's note saying, explicitly, that enforcement is intended once the existing findings are cleared:
+
+| Where | What it says |
+|---|---|
+| `superset-frontend/oxlint.json:176` | *"TODO: Graduate to `"error"` after cleanup pass — ~150 violations across the codebase require hoisting nested component definitions out of their parent render functions."* |
+| `superset-frontend/oxlint.json:168` | *"Disabled because the codebase still contains legacy class components; flip to `"error"` once the class-to-function migration completes."* |
+| `.pre-commit-config.yaml:176` | *"Advisory until pre-existing findings are resolved; remove `--no-exit-codes` to make this hook blocking."* |
+
+The system quotes these back in the issues it files, with line references. "The project asked for this" is a categorically stronger claim than "a tool found this" — and it is checkable.
+
+**Being precise about it:** the other gates carry no such statement. `jsx-key` is not mentioned in the config at all; it inherits a default. `ban-ts-comment` is simply `"off"`. Claiming a mandate where none is written would not survive a reviewer opening the file, so the tool only quotes rules that actually carry one.
+
+### Two instruments, pointed at different things
+
+Superset tracks its own tech debt: [`.github/workflows/tech-debt.yml`](https://github.com/apache/superset/blob/master/.github/workflows/tech-debt.yml) uploads lint counts to a **world-readable** Google Sheet every day. Nineteen months of data.
+
+It disagrees with their CI, because the two run different commands:
+
+```
+package.json "lint"            npx oxlint --config oxlint.json --quiet   → 1,434
+oxlint-metrics-uploader.js:82  npx oxlint --format json                  →    93
+```
+
+Without `--config`, oxlint uses its built-in defaults and never loads `oxlint.json`. **94% of what CI already counts is invisible to the dashboard — and that 94% is where every enforcement switch lives.** The dashboard's largest single number, `no-unused-vars` at 87, is a rule Superset explicitly set to `"off"`; the TypeScript replacement they actually enabled sits at zero.
+
+The asymmetry is what marks it as an oversight rather than a decision: the ESLint half of that same function *does* pass `--config`, twenty lines below, with a comment explaining the choice.
+
+And the part they can see has not improved. Like-for-like — the 13 rules present at both ends of the ESLint era — **533 → 560 across 324 measured days.** Up 5%, while being measured daily.
+
+```bash
+python ratchet/detector/upstream_metric.py --refresh
+```
+
+> Every rule Superset configured as `"error"` currently has **zero** findings. All 1,434 findings sit in rules set to `"warn"` or never configured. Debt exists exactly where enforcement doesn't — which is the entire argument for a ratchet over a dashboard.
+
 **A ratchet is a toothed wheel that turns one way and cannot turn back.** Cleanup alone decays — clear a rule today and the count regrows. Promoting the enforcement switch is what makes the work permanent, and it is the deliverable this system exists to produce.
 
 ---

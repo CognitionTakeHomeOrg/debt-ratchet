@@ -17,6 +17,28 @@ from __future__ import annotations
 from grouping import IssueUnit
 
 # Where each rule's enforcement switch lives, and what turning it on requires.
+# Where a maintainer has written down, in the repository, that they intend to
+# enforce a rule once the existing debt is cleared. Quoted verbatim, with a line
+# reference, because "the project asked for this" is a categorically stronger
+# argument than "a tool found this" -- and because it is checkable.
+#
+# Only rules that actually carry such a statement appear here. Three of the gates
+# this system remediates do not, and inventing a mandate for them would be the
+# fastest way to lose a reviewer who opens the config.
+MANDATE = {
+    "react/no-unstable-nested-components": (
+        "superset-frontend/oxlint.json#L176-L179",
+        'TODO: Graduate to "error" after cleanup pass — ~150 violations across '
+        "the codebase require hoisting nested component definitions out of their "
+        "parent render functions.",
+    ),
+    "react/prefer-function-component": (
+        "superset-frontend/oxlint.json#L168-L171",
+        "Disabled because the codebase still contains legacy class components; "
+        'flip to "error" once the class-to-function migration completes.',
+    ),
+}
+
 GATE_SWITCH = {
     "react/jsx-key": (
         "superset-frontend/oxlint.json",
@@ -80,9 +102,21 @@ def render(unit: IssueUnit, repo: str, sha: str) -> tuple[str, str]:
         f"`{unit.area}` ({len(unit.files)} files)"
     )
 
+    mandate = ""
+    if unit.rule in MANDATE:
+        where, quote = MANDATE[unit.rule]
+        mandate = (
+            f"\n## This is the project's own stated intent\n\n"
+            f"From [`{where.split('#')[0]}`]({where}):\n\n"
+            f"> {quote}\n\n"
+            f"The condition in that comment is what this issue exists to satisfy. "
+            f"It is not an outside opinion about code quality — it is a maintainer "
+            f"decision already written down and blocked on pre-existing debt.\n"
+        )
+
     body = f"""<!-- ratchet-fingerprint: {unit.fingerprint} -->
 **Gate:** `{unit.rule}` &nbsp;·&nbsp; **Enforcement today:** {switch_now} &nbsp;·&nbsp; **Findings:** {len(unit.findings)} across {len(unit.files)} files
-
+{mandate}
 This rule is checked on every CI run and enforced on none of them. `npm run lint`
 passes `--quiet`, so the findings are counted and then discarded. Clearing this
 area is one of the prerequisites for flipping the switch.
