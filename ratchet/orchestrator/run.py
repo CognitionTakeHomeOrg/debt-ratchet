@@ -11,8 +11,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -299,11 +301,41 @@ def _verify_and_report(con, env, row, pr_url: str) -> None:
     evidence unavoidable, not the decision.
     """
     number = pr_url.rstrip("/").rsplit("/", 1)[-1]
+
+    # Verification takes minutes and every run uses the same worktree path. The
+    # poll loop runs far more often than that, and a row stays selectable while
+    # it is `verifying` -- so without a lock a second poll starts a second
+    # verification, which begins by force-removing the worktree the first one is
+    # still reading. The result would be a spurious FAIL comment on a PR that
+    # was fine.
+    #
+    # A stale lock left by a crashed run is cleared rather than honoured: a row
+    # stuck in `verifying` should be retried on the next poll, not abandoned.
+    lock = Path(tempfile.gettempdir()) / "ratchet-verify.lock"
+    try:
+        fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        os.write(fd, str(os.getpid()).encode())
+        os.close(fd)
+    except FileExistsError:
+        try:
+            holder = int(lock.read_text().strip())
+            os.kill(holder, 0)  # signal 0 only tests for existence
+            print(f"  -> verification already running (pid {holder}); skipping")
+            return
+        except (ValueError, ProcessLookupError, PermissionError):
+            print("  -> clearing stale verification lock")
+            lock.unlink(missing_ok=True)
+            lock.write_text(str(os.getpid()))
+
     print(f"  -> verifying PR #{number} ...")
-    r = subprocess.run(
-        [sys.executable, str(Path(__file__).parent / "verify.py"), "--pr", number],
-        capture_output=True, text=True,
-    )
+    try:
+        r = subprocess.run(
+            [sys.executable, str(Path(__file__).parent / "verify.py"), "--pr", number],
+            capture_output=True, text=True,
+        )
+    finally:
+        lock.unlink(missing_ok=True)
+
     report = (r.stdout or r.stderr).strip()
     passed = r.returncode == 0
 
