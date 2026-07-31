@@ -288,7 +288,7 @@ def poll(args, root: Path, env: dict, con) -> int:
     return 0
 
 
-def _verify_and_report(con, env, row, pr_url: str) -> None:
+def _verify_and_report(con, env, row, pr_url: str, partial: bool = False) -> None:
     """Run the independent verifier and post its verdict on the pull request.
 
     Left manual, this was the weakest link in the whole system: the orchestrator
@@ -340,25 +340,41 @@ def _verify_and_report(con, env, row, pr_url: str) -> None:
     passed = r.returncode == 0
 
     tail = "\n".join(report.splitlines()[-25:])
-    verdict = "✅ **Independent verification passed**" if passed else \
-              "❌ **Independent verification FAILED**"
+    if partial:
+        verdict = "⚠️ **Partial fix — verified, gate still open**"
+        closing = (
+            "The session reported `gate_closed: false` and said why. The work it "
+            "*did* do is checked above; the remaining findings are untouched and "
+            "the issue stays open.\n\n"
+            "**This is a wanted outcome, not a failure.** A fix that closed the "
+            "gate by doing the risky part badly would have passed the linter and "
+            "broken behaviour. Review the rationale on the issue before merging."
+        )
+    elif passed:
+        verdict = "✅ **Independent verification passed**"
+        closing = "Ready for human review. **This does not merge anything.**"
+    else:
+        verdict = "❌ **Independent verification FAILED**"
+        closing = ("Do not merge. The gate may be green while the defect survives "
+                   "— that is exactly what these checks exist to catch.")
+
     body = (
         f"{verdict}\n\n"
         f"Re-run in a clean worktree with the lockfile-pinned toolchain — not the "
         f"session's own environment, and not its self-report.\n\n"
-        f"```\n{tail}\n```\n\n"
-        + ("Ready for human review. **This does not merge anything.**"
-           if passed else
-           "Do not merge. The gate may be green while the defect survives — that "
-           "is exactly what these checks exist to catch.")
+        f"```\n{tail}\n```\n\n{closing}"
     )
     subprocess.run(
         ["gh", "pr", "comment", number, "--repo", env["FORK_REPO"], "--body", body],
         capture_output=True,
     )
-    state.update(con, row["session_id"],
-                 status="pr_open" if passed else "failed")
-    print(f"  -> verification {'PASS' if passed else 'FAIL'}, posted to PR #{number}")
+    status = "escalated" if partial else ("pr_open" if passed else "failed")
+    state.update(con, row["session_id"], status=status)
+    if partial:
+        relabel(env["FORK_REPO"], row["issue_number"], "status:escalated",
+                ["devin:in-progress"])
+    print(f"  -> {'PARTIAL' if partial else ('PASS' if passed else 'FAIL')}, "
+          f"posted to PR #{number}")
 
 
 def _settle(con, env, row, st, pr, so) -> None:
@@ -379,12 +395,24 @@ def _settle(con, env, row, st, pr, so) -> None:
         state.update(con, row["session_id"], status="failed")
         print(f"  -> expired (hit the {env['MAX_ACU_PER_SESSION']} ACU cap or timed out)")
     elif st in ("finished", "completed"):
-        # Deliberately NOT 'merged'. The session claims it is done; verify.py has
-        # to reproduce that claim in our own container before anything is trusted.
+        # A session can finish having done correct work *and* not closed the gate.
+        # That is a third outcome, and it is the most interesting one: G1 fixed
+        # Theme.tsx and refused DragDroppable.tsx, because react-dnd's legacy
+        # DragSource/DropTarget hand the class instance to the hover and drop
+        # specs, and four other files read `component.mounted|ref|props|setState`
+        # off it. Converting it would have passed the linter and silently broken
+        # drag-and-drop -- exactly the failure the prompt forbids.
+        #
+        # Without this branch the verifier reports FAILED, because the gate is
+        # genuinely still open. Stamping "failed" on a correct partial fix would
+        # punish the behaviour the whole system is built to encourage, and would
+        # teach a reviewer to distrust the label.
+        partial = (so or {}).get("gate_closed") is False and bool(pr)
         state.update(con, row["session_id"], status="verifying")
-        print(f"  -> finished, running independent verification")
+        print("  -> finished" + (" (PARTIAL -- gate not closed, by its own report)"
+                                 if partial else ", running independent verification"))
         if pr:
-            _verify_and_report(con, env, row, pr)
+            _verify_and_report(con, env, row, pr, partial=partial)
 
         # A declared behaviour change is not a failure -- the prompt asks for it
         # to be declared rather than hidden, and here it caught a latent crash:
