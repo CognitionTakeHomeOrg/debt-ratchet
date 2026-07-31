@@ -94,12 +94,16 @@ docker compose run --rm simulate
 no environment: the fixtures are baked into the image, so it behaves identically
 on any machine. Runtime is about a minute; `-e FAST=1` skips the pacing.
 
-Simulate replays the recorded sessions behind the merged pull requests below,
-narrating the orchestrator's real decision sequence: detect → file → launch →
-Devin works → structured report → independent verification → human merges. The
-fixtures in `ratchet/fixtures/` are **recorded API responses and message streams
-from those actual runs**, not synthetic data. `simulate.py` refuses to touch a
-credential even if one is present in the environment.
+Simulate replays all five sessions below, narrating the orchestrator's real
+decision sequence: detect → file → launch → Devin works → structured report →
+independent verification → human merges. The fixtures in `ratchet/fixtures/` are
+**recorded API responses and message streams from those actual runs**, not
+synthetic data. `simulate.py` refuses to touch a credential even if one is
+present in the environment.
+
+**The escalated session is replayed in full**, ending on the reason it refused
+rather than on a success. A demo that shows only what worked is describing a
+different system.
 
 ### The dashboard
 

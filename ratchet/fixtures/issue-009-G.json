@@ -1,0 +1,71 @@
+{
+  "issue_number": 9,
+  "unit": {
+    "workstream": "G",
+    "area": "misc",
+    "rule": "react/prefer-function-component",
+    "findings": 2,
+    "fingerprint": "51f4b3fe8c7d"
+  },
+  "session": {
+    "session_id": "92c19e2d4efa4ed4a0568cb311a70400",
+    "status": "suspended",
+    "status_detail": "inactivity",
+    "acus_consumed": 0.0,
+    "pull_requests": [
+      {
+        "pr_url": "https://github.com/CognitionTakeHomeOrg/superset-adham-clone/pull/10",
+        "pr_state": "open"
+      }
+    ],
+    "structured_output": {
+      "is_final": true,
+      "rationale": "Theme is a theme container, not a React component; it was flagged only because it rendered JSX from a method. The provider is now a real function component created per instance in the constructor, with the closures defined inside the class body so private antdConfig access and the updateProviders re-binding are preserved exactly. Public API (<themeObject.SupersetThemeProvider>), the 'Theme is not initialized.' error, and the setConfig/toggleDarkMode update path are unchanged. Verification: check 1 printed 0; check 2 printed 1 (DragDroppable only); npm run type fails identically on base (598 TS6305 project-reference errors, 0 non-TS6305 errors) and tsc -b packages/superset-core exits 0; the given jest args match no test files, so the real suites were run (11 suites / 270 tests passed). No suppressions added; two stale eslint-disable comments were removed. PR #10 CI is green except dependency-review, which fails repo-wide because Dependency graph is disabled on the repository.",
+      "gate_closed": true,
+      "files_changed": [
+        "superset-frontend/packages/superset-core/src/theme/Theme.tsx"
+      ],
+      "blocked_reason": "src/dashboard/components/dnd/DragDroppable.tsx cannot be converted within the allowed scope: react-dnd 11's legacy DragSource/DropTarget decorators pass the decorated class instance as the third argument of the hover/drop specs, and dragDroppableConfig.ts, handleHover.ts, handleDrop.ts and util/getDropPosition.ts read component.mounted/ref/props and call component.setState. Making it a function component without migrating those callers to useDrag/useDrop makes getDecoratedComponentInstance() return null, so hover indicators and drops silently break while the linter passes. A correct fix requires editing those four files plus DragDroppable.test.tsx (which subclasses UnwrappedDragDroppable to seed state), all outside the permitted files. Repo-wide count for the rule is therefore 1, not 0.",
+      "findings_fixed": 1,
+      "behavior_change": false,
+      "suppressions_added": false
+    },
+    "title": "[G1] react/prefer-function-component in misc"
+  },
+  "messages": [
+    {
+      "source": "user",
+      "message": "## Repository\n\n`CognitionTakeHomeOrg/superset-adham-clone`, branched from `master` at `9f5611aca5425416d6eecd9ebe68fa3c865c4abe`.\n\nSuperset's own conventions are in `AGENTS.md` and `CLAUDE.md` at the repo root.\nRead them and follow them -- in particular: no `any` types, functional\ncomponents, and import UI components from `@superset-ui/core`.\n\n## Task\n\nThere are 2 `react/prefer-function-component` violations in `misc` (2 files). This rule is\nchecked on every CI run and enforced on none of them, because `npm run lint`\npasses `--quiet`, which hides findings but still counts them.\n\n`superset-frontend/packages/superset-core/src/theme/Theme.tsx`\n  line 40, col 14: Class component should be written as a function component.\n\n`superset-frontend/src/dashboard/components/dnd/DragDroppable.tsx`\n  line 136, col 14: Class component should be written as a function component.\n\n## Definition of done\n\nRun these yourself and confirm each one before opening a pull request. All paths\nare relative to `superset-frontend/`. Use the lockfile-pinned binary at\n`./node_modules/.bin/oxlint`, **not** `npx` -- npx may resolve a different\nversion than the lockfile and give you a different answer than CI.\n\n```bash\ncd superset-frontend\n\n# 1. This area is clean.\n./node_modules/.bin/oxlint --config oxlint.json -A all -D react/prefer-function-component --format json \\\n  | jq '[.diagnostics[] | select(.filename | startswith(\"misc/\"))] | length'\n# must print 0\n\n# 2. Nothing else regressed. The repo-wide count for this rule must be exactly\n#    0, down from 2. Higher means you broke something; lower means\n#    you changed files outside the scope of this task.\n./node_modules/.bin/oxlint --config oxlint.json -A all -D react/prefer-function-component --format json \\\n  | jq '.diagnostics | length'\n\n# 3. Types still check.\nnpm run type\n\n# 4. Tests still pass for what you touched.\nnpm run test -- packages/superset-core/src/theme/Theme.tsx src/dashboard/components/dnd/DragDroppable.tsx\n```\n\n## Constraints\n\n- Do not suppress the rule. Suppression is a failed session, not a fix.\n- Fix the cause, not the symptom.\n- Do not modify `oxlint.json`, and do not add any lint-disable or `@ts-ignore`\n  comment. Changing the rule's configuration is a failed session, not a fix.\n- Do not touch files outside `misc`.\n- If a correct fix requires changing runtime behaviour, make the change and state\n  it explicitly in the pull request body. Do not hide it.\n- **If you cannot fix something correctly, stop and explain why.** A blocked\n  session is a valid, expected outcome and a human will review it. A fix that\n  passes the linter while preserving the defect is not a valid outcome.\n\n## Pull request\n\nOpen a PR against `master` of `CognitionTakeHomeOrg/superset-adham-clone`. Follow `.github/PULL_REQUEST_TEMPLATE.md`\nand Conventional Commits, e.g. `fix(components): add stable keys to error message lists`.\nState in the body which of the four checks above you ran and what they printed.\n\n## Output\n\nConform to the provided structured output schema. `gate_closed` must be true only\nif check 1 actually printed 0 when you ran it.\n"
+    },
+    {
+      "source": "devin",
+      "message": "Starting: converting the two class components (Theme.tsx, DragDroppable.tsx) to function components, then running the four checks."
+    },
+    {
+      "source": "devin",
+      "message": "Only 1 of the 2 findings is fixed \u2014 repo-wide count is 1, not 0: https://github.com/CognitionTakeHomeOrg/superset-adham-clone/pull/10\n\n- Fixed `Theme.tsx`: `Theme` isn't a React component, it just rendered JSX from a method; the provider is now a real function component created per instance (no behaviour change, no suppressions \u2014 two stale eslint-disable comments removed).\n- Blocked on `DragDroppable.tsx`: react-dnd 11's legacy `DragSource`/`DropTarget` pass the class *instance* to the hover/drop specs, and `dragDroppableConfig.ts` / `handleHover.ts` / `handleDrop.ts` / `getDropPosition.ts` use `component.mounted|ref|props|setState`. Making it a function component without migrating those to `useDrag`/`useDrop` silently breaks hover indicators and drops while passing the linter. A correct fix needs those four files plus `DragDroppable.test.tsx` (which subclasses the class) \u2014 all outside the allowed scope.\n\nChecks: (1) printed 0; (2) printed 1; (3) `npm run type` fails identically on base (598 `TS6305` project-reference errors, 0 real errors) and `tsc -b packages/superset-core` exits 0; (4) the given jest args match no test files, so I ran the real suites \u2014 270 tests passed."
+    },
+    {
+      "source": "devin",
+      "message": "Reviewer's \"verification FAILED\" reproduces exactly what I reported: in a clean worktree at `c3eb2666cc` with a fresh install and the pinned oxlint, check 1 = 0 but check 2 = **1** (`DragDroppable.tsx`), so the gate is not closed. Theme.tsx is fixed; type/test results are unchanged from base. Replied on the PR: https://github.com/CognitionTakeHomeOrg/superset-adham-clone/pull/10#issuecomment-5144437642\n\nWant me to expand scope and do the react-dnd `useDrag`/`useDrop` migration (touching `dragDroppableConfig.ts`, `handleHover.ts`, `handleDrop.ts`, `getDropPosition.ts` and `DragDroppable.test.tsx`) to get the count to 0? That's the only correct way to convert it."
+    },
+    {
+      "source": "devin",
+      "message": "Checking the new PR feedback now."
+    },
+    {
+      "source": "devin",
+      "message": "The reviewer deleted their \"verification FAILED\" comment; no new actionable feedback on the PR. State is unchanged: Theme.tsx fixed, repo-wide `react/prefer-function-component` count is 1 because `DragDroppable.tsx` is intentionally untouched (converting it under react-dnd 11's decorator API would silence the rule while breaking hover/drop).\n\nShould I expand scope and do the react-dnd `useDrag`/`useDrop` migration (touching `dragDroppableConfig.ts`, `handleHover.ts`, `handleDrop.ts`, `getDropPosition.ts`, `DragDroppable.test.tsx`) to get the count to 0, or leave the PR as the partial fix? https://github.com/CognitionTakeHomeOrg/superset-adham-clone/pull/10"
+    },
+    {
+      "source": "devin",
+      "message": "Checking the new PR feedback now."
+    },
+    {
+      "source": "devin",
+      "message": "Reviewer re-ran verification and it now says **VERDICT: PASS** \u2014 the partial fix is accepted, the gate intentionally stays open for `DragDroppable.tsx`, and the issue remains open (\"This is a wanted outcome, not a failure\"). No code changes needed; nothing further from me unless you want the react-dnd hooks migration. https://github.com/CognitionTakeHomeOrg/superset-adham-clone/pull/10"
+    }
+  ],
+  "final_status": "escalated",
+  "pr_url": "https://github.com/CognitionTakeHomeOrg/superset-adham-clone/pull/10"
+}

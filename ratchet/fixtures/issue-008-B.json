@@ -1,0 +1,55 @@
+{
+  "issue_number": 8,
+  "unit": {
+    "workstream": "B",
+    "area": "src/components",
+    "rule": "react/no-unstable-nested-components",
+    "findings": 18,
+    "fingerprint": "772b48573da8"
+  },
+  "session": {
+    "session_id": "00016677eeb4453f8ce9acb3915fbfda",
+    "status": "suspended",
+    "status_detail": "inactivity",
+    "acus_consumed": 0.0,
+    "pull_requests": [
+      {
+        "pr_url": "https://github.com/CognitionTakeHomeOrg/superset-adham-clone/pull/11",
+        "pr_state": "open"
+      }
+    ],
+    "structured_output": {
+      "rationale": "All 18 react/no-unstable-nested-components findings in src/components were fixed by hoisting component-shaped functions out of parent renders, not by suppression. Verified: check 1 printed 0; check 2 printed 132 (down from 150); npm run type passed (after npm run plugins:build, as CI does, on Node 24.16.0); the literal test command matched source paths so jest found no tests, so the corresponding suites (ChartContextMenu, DrillByModal, DrillBySubmenu, ChangeDatasourceModal, DatasourceEditor tests, PanelToolbar) were run: 7 suites / 71 tests passed. behavior_change is true in one narrow, user-observable sense: DrillBySubmenu previously defined its react-window Row component inside render, so every parent render remounted all visible rows (losing row-level state/focus); hoisting it to module scope with handleSelection passed via itemData removes those remounts. Rendered output is otherwise identical. All other sites (CollectionTable itemRenderers, TableCollection Cell renderers, antd dropdownRender/popupRender/itemRender) invoke the functions as plain calls, so hoisting them is behaviour-neutral. Type-only corrections: ChangeDatasourceModal now uses SelectedDataset = Dataset & { type: string } instead of the inaccurate Datasource type (uid was never read) and drops two `any` cell props; DatasourceEditor's Metric interface gained the optional is_certified field it was already read through.",
+      "gate_closed": true,
+      "files_changed": [
+        "superset-frontend/src/components/Chart/ChartContextMenu/ChartContextMenu.tsx",
+        "superset-frontend/src/components/Chart/DrillBy/DrillByModal.tsx",
+        "superset-frontend/src/components/Chart/DrillBy/DrillBySubmenu.tsx",
+        "superset-frontend/src/components/Datasource/ChangeDatasourceModal/index.tsx",
+        "superset-frontend/src/components/Datasource/components/DatasourceEditor/DatasourceEditor.tsx",
+        "superset-frontend/src/components/PanelToolbar/index.tsx"
+      ],
+      "blocked_reason": null,
+      "findings_fixed": 18,
+      "behavior_change": true,
+      "suppressions_added": false
+    },
+    "title": "[B2] react/no-unstable-nested-components in src/components"
+  },
+  "messages": [
+    {
+      "source": "user",
+      "message": "## Repository\n\n`CognitionTakeHomeOrg/superset-adham-clone`, branched from `master` at `9f5611aca5425416d6eecd9ebe68fa3c865c4abe`.\n\nSuperset's own conventions are in `AGENTS.md` and `CLAUDE.md` at the repo root.\nRead them and follow them -- in particular: no `any` types, functional\ncomponents, and import UI components from `@superset-ui/core`.\n\n## Task\n\nThere are 18 `react/no-unstable-nested-components` violations in `src/components` (6 files). This rule is\nchecked on every CI run and enforced on none of them, because `npm run lint`\npasses `--quiet`, which hides findings but still counts them.\n\n`superset-frontend/src/components/Chart/ChartContextMenu/ChartContextMenu.tsx`\n  line 423, col 25: Do not define components during render.\n\n`superset-frontend/src/components/Chart/DrillBy/DrillByModal.tsx`\n  line 555, col 23: Do not define components during render.\n\n`superset-frontend/src/components/Chart/DrillBy/DrillBySubmenu.tsx`\n  line 193, col 15: Do not define components during render.\n\n`superset-frontend/src/components/Datasource/ChangeDatasourceModal/index.tsx`\n  line 208, col 13: Do not define components during render.\n  line 239, col 13: Do not define components during render.\n\n`superset-frontend/src/components/Datasource/components/DatasourceEditor/DatasourceEditor.tsx`\n  line 688, col 28: Do not define components during render.\n  line 714, col 21: Do not define components during render.\n  line 715, col 35: Do not define components during render.\n  line 721, col 28: Do not define components during render.\n  line 743, col 21: Do not define components during render.\n  line 2251, col 26: Do not define components during render.\n  line 2272, col 27: Do not define components during render.\n  line 2275, col 25: Do not define components during render.\n  line 2288, col 26: Do not define components during render.\n  line 2296, col 23: Do not define components during render.\n  line 2341, col 19: Do not define components during render.\n  line 2348, col 21: Do not define components during render.\n\n`superset-frontend/src/components/PanelToolbar/index.tsx`\n  line 129, col 24: Do not define components during render.\n\n## Definition of done\n\nRun these yourself and confirm each one before opening a pull request. All paths\nare relative to `superset-frontend/`. Use the lockfile-pinned binary at\n`./node_modules/.bin/oxlint`, **not** `npx` -- npx may resolve a different\nversion than the lockfile and give you a different answer than CI.\n\n```bash\ncd superset-frontend\n\n# 1. This area is clean.\n./node_modules/.bin/oxlint --config oxlint.json -A all -D react/no-unstable-nested-components --format json \\\n  | jq '[.diagnostics[] | select(.filename | startswith(\"src/components/\"))] | length'\n# must print 0\n\n# 2. Nothing else regressed. The repo-wide count for this rule must be exactly\n#    132, down from 150. Higher means you broke something; lower means\n#    you changed files outside the scope of this task.\n./node_modules/.bin/oxlint --config oxlint.json -A all -D react/no-unstable-nested-components --format json \\\n  | jq '.diagnostics | length'\n\n# 3. Types still check.\nnpm run type\n\n# 4. Tests still pass for what you touched.\nnpm run test -- src/components/Chart/ChartContextMenu/ChartContextMenu.tsx src/components/Chart/DrillBy/DrillByModal.tsx src/components/Chart/DrillBy/DrillBySubmenu.tsx src/components/Datasource/ChangeDatasourceModal/index.tsx src/components/Datasource/components/DatasourceEditor/DatasourceEditor.tsx src/components/PanelToolbar/index.tsx\n```\n\n## Constraints\n\n- Do not suppress the rule. Suppression is a failed session, not a fix.\n- Fix the cause, not the symptom.\n- Do not modify `oxlint.json`, and do not add any lint-disable or `@ts-ignore`\n  comment. Changing the rule's configuration is a failed session, not a fix.\n- Do not touch files outside `src/components`.\n- If a correct fix requires changing runtime behaviour, make the change and state\n  it explicitly in the pull request body. Do not hide it.\n- **If you cannot fix something correctly, stop and explain why.** A blocked\n  session is a valid, expected outcome and a human will review it. A fix that\n  passes the linter while preserving the defect is not a valid outcome.\n\n## Pull request\n\nOpen a PR against `master` of `CognitionTakeHomeOrg/superset-adham-clone`. Follow `.github/PULL_REQUEST_TEMPLATE.md`\nand Conventional Commits, e.g. `fix(components): add stable keys to error message lists`.\nState in the body which of the four checks above you ran and what they printed.\n\n## Output\n\nConform to the provided structured output schema. `gate_closed` must be true only\nif check 1 actually printed 0 when you ran it.\n"
+    },
+    {
+      "source": "devin",
+      "message": "Starting on the 18 react/no-unstable-nested-components violations in src/components."
+    },
+    {
+      "source": "devin",
+      "message": "PR: https://github.com/CognitionTakeHomeOrg/superset-adham-clone/pull/11\n\nAll 18 `react/no-unstable-nested-components` findings in `src/components` fixed by hoisting renderers/components out of render \u2014 no suppressions, no `oxlint.json` change. Verification: area count `0`, repo-wide `132` (from 150), `npm run type` clean, 7 test suites / 71 tests pass. Note: the literal test command in the task matches source files, not test files, so jest reported \"No tests found\"; I ran the corresponding `.test.tsx` suites instead.\n\nOne real bug fixed along the way: `DrillBySubmenu` defined its virtualized `Row` component inside render, remounting every visible row on each parent render.\n\nWant me to test the Drill by / dataset editor flows in the UI end-to-end?\n[OFFER_TEST_APP]Test Drill by & dataset UI[/OFFER_TEST_APP]"
+    }
+  ],
+  "final_status": "pr_open",
+  "pr_url": "https://github.com/CognitionTakeHomeOrg/superset-adham-clone/pull/11"
+}

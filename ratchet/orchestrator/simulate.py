@@ -7,16 +7,20 @@ organisation, no API key, and no fork of Superset. Without this they can read th
 code and take the author's word for what it does.
 
 What is replayed is genuine. `fixtures/` holds the actual API responses and the
-actual message streams from the three sessions that produced the three merged
-pull requests -- recorded, not written. The narration below is the orchestrator's
-real decision sequence driven by that data.
+actual message streams from all five sessions -- three merged, one verified and
+awaiting review, one escalated -- recorded, not written. The narration below is
+the orchestrator's real decision sequence driven by that data.
+
+The escalated one is replayed in full rather than quietly dropped. A demo that
+shows only its successes is describing a different system.
 
 What is *not* replayed: the gate runs. Those need the Superset checkout and its
 toolchain, so their real outputs are quoted from `baseline/` instead. Every
 number shown is one this system actually measured.
 
     python simulate.py            # replay everything
-    python simulate.py --fast     # no pacing delays
+    python simulate.py --fast     # no pacing delays (FAST=1 works too, and is
+                                  # the only spelling that survives compose run)
 """
 
 from __future__ import annotations
@@ -25,6 +29,7 @@ import argparse
 import json
 import os
 import sys
+import textwrap
 import time
 from pathlib import Path
 
@@ -152,28 +157,52 @@ def replay(fx: dict, idx: int, total: int) -> dict:
     say(f"   {C['dim']}...and this claim is now treated as evidence, not proof.{C['0']}", 1.0)
     say()
 
+    # `blocked_reason` is the only optional field in the output schema, so a
+    # non-null value is volunteered: the session naming something it would not
+    # do. That, not the count and not `gate_closed`, is what makes a run partial.
+    blocked = so.get("blocked_reason")
+    status = fx.get("final_status", "merged")
+
     say(f"{C['b']}6. VERIFY INDEPENDENTLY{C['0']}  {C['dim']}(our container, our oracle){C['0']}")
     for chk in VERIFY_CHECKS[gate]:
         say(f"   {C['g']}[PASS]{C['0']} {chk.format(rule=u['rule'], area=u['area'])}", 0.18)
-    say(f"   {C['b']}{C['g']}VERDICT: PASS{C['0']}", 0.8)
+    if blocked:
+        say(f"   {C['b']}{C['y']}VERDICT: PARTIAL — work verified, gate still open{C['0']}", 0.8)
+    else:
+        say(f"   {C['b']}{C['g']}VERDICT: PASS{C['0']}", 0.8)
     say()
 
-    say(f"{C['b']}7. HUMAN MERGES{C['0']}")
-    if so.get("behavior_change"):
-        say(f"   {C['y']}flagged needs:human-review — declared behaviour change{C['0']}")
-        say(f"   {C['dim']}a linter cannot tell you whether changed behaviour is wanted{C['0']}")
-    say(f"   {fx['pr_url']}")
-    say(f"   {C['dim']}nothing in this system merges anything. That is deliberate.{C['0']}", 0.8)
+    if blocked:
+        say(f"{C['b']}7. ESCALATE{C['0']}  {C['dim']}(it stopped, and said why){C['0']}")
+        say(f"   {C['y']}issue labelled status:escalated — not retried{C['0']}")
+        say(f"   {C['dim']}retrying a blocked session spends money to hit the same wall{C['0']}")
+        for line in textwrap.wrap(" ".join(blocked.split()), 76)[:6]:
+            say(f"   {C['c']}|{C['0']} {line}", 0.12)
+        say(f"   {fx['pr_url']}  {C['dim']}(open — the finished half is still reviewable){C['0']}")
+        say(f"   {C['dim']}a fix that closed the gate by doing this badly would have passed "
+            f"the linter.{C['0']}", 0.8)
+    else:
+        say(f"{C['b']}7. HUMAN MERGES{C['0']}")
+        if so.get("behavior_change"):
+            say(f"   {C['y']}flagged needs:human-review — declared behaviour change{C['0']}")
+            say(f"   {C['dim']}a linter cannot tell you whether changed behaviour is wanted{C['0']}")
+        say(f"   {fx['pr_url']}")
+        say(f"   {C['dim']}nothing in this system merges anything. That is deliberate.{C['0']}", 0.8)
 
-    return {"rule": u["rule"], "fixed": u["findings"], "behavior_change": so.get("behavior_change")}
+    return {"rule": u["rule"], "fixed": u["findings"], "status": status,
+            "behavior_change": so.get("behavior_change"), "blocked": bool(blocked)}
 
 
 def outro(results: list[dict]) -> None:
     rule("OBSERVABILITY")
     say()
+    # Only merged work counts as cleared. Verified-but-unmerged is real progress
+    # and is reported separately below -- never folded into the burndown, because
+    # nothing is banked until a human accepts it.
     fixed_by_rule: dict[str, int] = {}
     for r in results:
-        fixed_by_rule[r["rule"]] = fixed_by_rule.get(r["rule"], 0) + r["fixed"]
+        if r["status"] == "merged":
+            fixed_by_rule[r["rule"]] = fixed_by_rule.get(r["rule"], 0) + r["fixed"]
 
     say(f"  {C['dim']}{'gate':<38} {'cleared':>10}  burndown{C['0']}")
     for name, count, _, _ in GATES:
@@ -185,12 +214,17 @@ def outro(results: list[dict]) -> None:
         col = C["g"] if fixed else C["dim"]
         say(f"  {name:<38} {col}{fixed:>4}/{real:<5}{C['0']}  {col}{bar}{C['0']} {pct}%", 0.2)
 
-    total = sum(r["fixed"] for r in results)
+    merged = [r for r in results if r["status"] == "merged"]
+    escalated = [r for r in results if r["status"] == "escalated"]
+    in_review = [r for r in results if r["status"] not in ("merged", "escalated")]
     say()
     say(f"  {C['b']}gates closed        0 / {len(GATES)}{C['0']}   "
         f"{C['dim']}<- the headline. It is the only number here that cannot decay.{C['0']}")
-    say(f"  findings fixed      {total}")
-    say(f"  merged              {len(results)}     escalated 0     success 100%")
+    say(f"  findings merged     {sum(r['fixed'] for r in merged)}")
+    say(f"  awaiting review     {sum(r['fixed'] for r in in_review)}   "
+        f"{C['dim']}verified, not banked — a human has not accepted it yet{C['0']}")
+    say(f"  merged              {len(merged)}     escalated {len(escalated)}     "
+        f"in review {len(in_review)}")
     say(f"  cost / merged PR    {C['dim']}n/a — the API reported 0 ACU on every session{C['0']}", 0.8)
 
     rule("THE POINT")
