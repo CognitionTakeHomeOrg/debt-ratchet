@@ -79,6 +79,14 @@ def snapshot() -> dict:
     acu = sum(r["acu_spent"] or 0 for r in rows)
     findings_fixed = sum(r["findings"] for r in merged)
 
+    # Work that is verified but not yet merged is real progress and must be
+    # visible -- otherwise the headline understates the system every time a PR
+    # is waiting on a human, which is precisely the state the design intends.
+    # Counted separately from merged, never added to it: nothing is banked until
+    # someone accepts it.
+    in_review = sum(r["findings"] for r in rows if r["status"] in ("pr_open", "verifying"))
+    partial = sum(r["findings"] for r in rows if r["status"] == "escalated")
+
     gates = []
     for rule, meta in BASELINE.items():
         touched = [r for r in rows if r["rule"] == rule]
@@ -112,6 +120,8 @@ def snapshot() -> dict:
         "gates_total": len(gates),
         "gates": gates,
         "findings_fixed": findings_fixed,
+        "findings_in_review": in_review,
+        "findings_partial": partial,
         "acu_spent": round(acu, 2),
         "acu_ceiling": float(ENV["GLOBAL_ACU_CEILING"]),
         "usd_spent": round(acu * USD_PER_ACU, 2),
@@ -166,7 +176,9 @@ def render(d: dict) -> str:
     cards = "".join([
         card("Gates closed", f'{d["gates_closed"]}/{d["gates_total"]}',
              "a closed gate cannot reopen", hero=True),
-        card("Findings fixed", d["findings_fixed"], "verified independently, then merged"),
+        card("Findings merged", d["findings_fixed"], "verified independently, then merged"),
+        card("Awaiting review", d["findings_in_review"] + d["findings_partial"],
+             f'{d["findings_in_review"]} verified · {d["findings_partial"]} partial'),
         card("Cost / merged PR",
              f'${d["cost_per_merged_pr"]}' if d["cost_per_merged_pr"] is not None else "n/a",
              f'{d["acu_spent"]} of {d["acu_ceiling"]} ACU used' if d["acu_reported_by_api"]
