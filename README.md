@@ -246,21 +246,51 @@ reach that**, so filing an issue will not start anything until you connect the
 two. There are two ways, and the second needs no inbound network at all.
 
 **Either — the webhook.** Expose the receiver and register it on the repository
-under measurement:
+under measurement. `cloudflared` needs no account and no signup; the quick tunnel
+prints a public hostname that forwards straight to your laptop.
 
 ```bash
-cloudflared tunnel --url http://localhost:8099        # or: ngrok http 8099
+brew install cloudflared          # or: https://github.com/cloudflare/cloudflared/releases
 
-gh api repos/$FORK_REPO/hooks -X POST \
-  -f name=web -F active=true -f 'events[]=issues' \
-  -f config[url]="https://<tunnel-host>/webhook" \
-  -f config[content_type]=json \
-  -f config[secret]="$GITHUB_WEBHOOK_SECRET"
+# 1. the receiver
+docker compose up -d orchestrator                     # or: python ratchet/orchestrator/webhook.py
+
+# 2. the tunnel -- leave it running, it prints the URL into the log
+cloudflared tunnel --url http://localhost:8099 > /tmp/cf.log 2>&1 &
+sleep 8
+URL=$(grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' /tmp/cf.log | head -1)
+echo "$URL"
+
+# 3. register it on the repository under measurement
+set -a; . ./.env; set +a
+gh api "repos/$FORK_REPO/hooks" -X POST --input - <<JSON
+{"name":"web","active":true,"events":["issues"],
+ "config":{"url":"$URL/webhook","content_type":"json",
+           "secret":"$GITHUB_WEBHOOK_SECRET","insecure_ssl":"0"}}
+JSON
 ```
+
+Confirm GitHub can actually reach you — creating a hook triggers a `ping`:
+
+```bash
+gh api "repos/$FORK_REPO/hooks" --jq '.[-1].id' \
+  | xargs -I{} gh api "repos/$FORK_REPO/hooks/{}/deliveries" \
+      --jq '.[0] | "\(.event) -> \(.status) (\(.status_code))"'
+# ping -> OK (200)
+```
+
+`OK (200)` means the loop is closed: filing an issue now starts a session with no
+further input. Anything else and the tunnel or the secret is wrong — the receiver
+logs `skip: ping` for the handshake and `bad signature` for a secret mismatch.
 
 Signatures are verified with HMAC against that secret, and the handler ignores
 anything that is not a detector-filed issue carrying `devin:queued` — without
 that check, any human opening any issue would start a paid session.
+
+> Quick tunnels get a **new hostname every restart**, so re-register the hook (or
+> update it with `-X PATCH`) whenever `cloudflared` restarts. Delete stale hooks
+> with `gh api repos/$FORK_REPO/hooks/<id> -X DELETE`; a dead hook is a webhook
+> that silently fails and makes the system look broken when it is not.
 
 **Or — the reconciler.** Ask GitHub what is queued instead of waiting to be told:
 
@@ -281,11 +311,11 @@ python ratchet/orchestrator/run.py --issue 13 --dry-run   # print the prompt, sp
 python ratchet/orchestrator/run.py --issue 13             # launch, poll, verify, report
 ```
 
-> **How the sessions in this repository were run.** The receiver and reconciler
-> are both implemented and are the same launch path, but no public tunnel was
-> stood up for this project — every session here was started with
-> `run.py --issue N`. The event-driven leg is built and unit-triggerable; what
-> was never deployed is the inbound delivery.
+> **How the sessions in this repository were run.** The first five were started
+> with `run.py --issue N` — the same launch path the webhook calls — before the
+> tunnel existed. The webhook route above has since been stood up and verified
+> end to end against this fork: GitHub delivers, the HMAC check passes, and a
+> filed issue starts a session with no further input.
 
 ## How it works
 
