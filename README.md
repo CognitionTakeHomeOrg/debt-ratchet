@@ -252,45 +252,58 @@ prints a public hostname that forwards straight to your laptop.
 ```bash
 brew install cloudflared          # or: https://github.com/cloudflare/cloudflared/releases
 
-# 1. the receiver
-docker compose up -d orchestrator                     # or: python ratchet/orchestrator/webhook.py
-
-# 2. the tunnel -- leave it running, it prints the URL into the log
-cloudflared tunnel --url http://localhost:8099 > /tmp/cf.log 2>&1 &
-sleep 8
-URL=$(grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' /tmp/cf.log | head -1)
-echo "$URL"
-
-# 3. register it on the repository under measurement
-set -a; . ./.env; set +a
-gh api "repos/$FORK_REPO/hooks" -X POST --input - <<JSON
-{"name":"web","active":true,"events":["issues"],
- "config":{"url":"$URL/webhook","content_type":"json",
-           "secret":"$GITHUB_WEBHOOK_SECRET","insecure_ssl":"0"}}
-JSON
+docker compose up -d orchestrator          # the receiver, on :8099
+python ratchet/orchestrator/tunnel.py      # tunnel + point the hook at it
 ```
 
-Confirm GitHub can actually reach you — creating a hook triggers a `ping`:
+```
+starting tunnel ...
+  https://future-workplace-capacity-align.trycloudflare.com
+  hook 659572191 re-pointed -> https://future-workplace-capacity-align.../webhook
+  delivery: ping -> OK (200)
+
+loop closed. Filing an issue now starts a session:
+  python ratchet/detector/detect.py --workstream C --only-area src/explore --apply
+```
+
+**The address is not something you type.** A quick tunnel gets a new hostname
+every restart, so a hand-registered hook is correct exactly once — after that it
+points at a host that no longer exists and deliveries fail into the void, which
+is the worst failure mode available because nothing reports it. `tunnel.py`
+therefore reads the hostname it was actually given and **upserts**: one hook is
+reused and re-pointed rather than a second one added, since a pile of stale hooks
+is that same silent failure multiplied. Run it again after any restart.
+
+It then makes GitHub prove reachability by firing a **fresh** ping and waiting
+for a delivery newer than the one on record. Reading the newest delivery is not
+enough — after a re-point that delivery describes the *previous* URL, so a hook
+aimed at a dead host would report the last success of a tunnel that no longer
+exists.
 
 ```bash
-gh api "repos/$FORK_REPO/hooks" --jq '.[-1].id' \
-  | xargs -I{} gh api "repos/$FORK_REPO/hooks/{}/deliveries" \
-      --jq '.[0] | "\(.event) -> \(.status) (\(.status_code))"'
-# ping -> OK (200)
+python ratchet/orchestrator/tunnel.py --status   # ping now, print the verdict
+python ratchet/orchestrator/tunnel.py --prune    # remove every receiver hook
+python ratchet/orchestrator/tunnel.py --url https://my.public.host   # skip the tunnel
 ```
 
-`OK (200)` means the loop is closed: filing an issue now starts a session with no
-further input. Anything else and the tunnel or the secret is wrong — the receiver
-logs `skip: ping` for the handshake and `bad signature` for a secret mismatch.
+`ping -> OK (200)` means the loop is closed. `530` means Cloudflare reached the
+tunnel but not the receiver behind it. Signatures are HMAC-verified against
+`GITHUB_WEBHOOK_SECRET`, and the handler ignores anything that is not a
+detector-filed issue carrying `devin:queued` — without that check, any human
+opening any issue would start a paid session.
 
-Signatures are verified with HMAC against that secret, and the handler ignores
-anything that is not a detector-filed issue carrying `devin:queued` — without
-that check, any human opening any issue would start a paid session.
+### Poll the sessions
 
-> Quick tunnels get a **new hostname every restart**, so re-register the hook (or
-> update it with `-X PATCH`) whenever `cloudflared` restarts. Delete stale hooks
-> with `gh api repos/$FORK_REPO/hooks/<id> -X DELETE`; a dead hook is a webhook
-> that silently fails and makes the system look broken when it is not.
+Launching is event-driven; **settling is polled**. One loop mirrors each session's
+progress onto its issue, runs `verify.py` when a pull request appears, and posts
+the verdict:
+
+```bash
+while true; do python ratchet/orchestrator/run.py --poll; sleep 60; done
+```
+
+Without it a session still runs and still opens a pull request — nothing verifies
+it or reports back.
 
 **Or — the reconciler.** Ask GitHub what is queued instead of waiting to be told:
 
