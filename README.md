@@ -28,7 +28,7 @@ A quality gate is two things: a **checker** and an **enforcement switch**. Super
 | mypy `warn_unused_ignores` | disabled for 8 modules | 49 | `pyproject.toml` |
 | zizmor (Actions security) | `--no-exit-codes` | 1 | `.pre-commit-config.yaml` |
 
-**Two of these six have runners here** — oxlint and mypy, covering five of the rules above. The rest are measured and documented in `baseline/` but not yet automated; adding one means writing a function that returns a list of `Finding`, and nothing downstream changes. See *Why an agent* for what was deliberately left out and why.
+**Two of these six have runners here** — oxlint and mypy, covering five of the rules above. The rest are measured and documented in `baseline/` but not yet automated. Adding one means writing a function that returns a list of `Finding`; everything downstream — grouping, issue filing, the prompt contract, verification, the ratchet — already works on normalized findings and never learns which tool produced them. The wiring is six config tables that should be one registry, and [**docs/adding-a-gate.md**](docs/adding-a-gate.md) walks through it end to end with zizmor as the worked example, including the parts that are unfinished. See *Why an agent* for what was deliberately left out and why.
 
 The `zizmor` config states the deadlock outright:
 
