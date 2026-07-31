@@ -239,6 +239,54 @@ The checkout must exist before `up`: Docker cannot bind-mount a path that is not
 there. Set `FORK_PATH` if you keep it somewhere else. This is the only step that
 spends money — the budget controls are enforced before any session is created.
 
+### Closing the loop: getting the event to the orchestrator
+
+`docker compose up` gives you a receiver on `localhost:8099`. **GitHub cannot
+reach that**, so filing an issue will not start anything until you connect the
+two. There are two ways, and the second needs no inbound network at all.
+
+**Either — the webhook.** Expose the receiver and register it on the repository
+under measurement:
+
+```bash
+cloudflared tunnel --url http://localhost:8099        # or: ngrok http 8099
+
+gh api repos/$FORK_REPO/hooks -X POST \
+  -f name=web -F active=true -f 'events[]=issues' \
+  -f config[url]="https://<tunnel-host>/webhook" \
+  -f config[content_type]=json \
+  -f config[secret]="$GITHUB_WEBHOOK_SECRET"
+```
+
+Signatures are verified with HMAC against that secret, and the handler ignores
+anything that is not a detector-filed issue carrying `devin:queued` — without
+that check, any human opening any issue would start a paid session.
+
+**Or — the reconciler.** Ask GitHub what is queued instead of waiting to be told:
+
+```bash
+python ratchet/orchestrator/run.py --poll
+```
+
+This is not a lesser fallback. Webhooks get missed — tunnels drop, processes
+restart, a delivery exhausts its retries — so the reconciler runs *alongside* the
+receiver in normal operation and is what makes the system converge rather than
+depend on every delivery landing. On a laptop it is also the whole loop by
+itself, with no tunnel and nothing exposed.
+
+To launch one specific issue, which is the same code path the webhook calls:
+
+```bash
+python ratchet/orchestrator/run.py --issue 13 --dry-run   # print the prompt, spend nothing
+python ratchet/orchestrator/run.py --issue 13             # launch, poll, verify, report
+```
+
+> **How the sessions in this repository were run.** The receiver and reconciler
+> are both implemented and are the same launch path, but no public tunnel was
+> stood up for this project — every session here was started with
+> `run.py --issue N`. The event-driven leg is built and unit-triggerable; what
+> was never deployed is the inbound delivery.
+
 ## How it works
 
 ```
