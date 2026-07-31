@@ -32,6 +32,13 @@ RUN python3 -m venv /opt/mypy-gate \
          types-pytz types-croniter types-PyYAML types-setuptools types-paramiko \
          types-Markdown
 
+# The repository under measurement is bind-mounted from the host, so its files
+# are owned by the host user while this container runs as root. Git treats that
+# as "dubious ownership" and refuses every command -- which would break the
+# detector's clean-tree assertion before any gate ran. The mount is read-only
+# and the container measures rather than commits, so trusting it is safe here.
+RUN git config --global --add safe.directory '*'
+
 WORKDIR /app
 # Mirror the repository layout under /app rather than flattening it.
 #
