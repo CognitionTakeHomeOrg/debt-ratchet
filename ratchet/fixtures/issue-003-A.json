@@ -1,0 +1,53 @@
+{
+  "issue_number": 3,
+  "unit": {
+    "workstream": "A",
+    "area": "src/pages",
+    "rule": "react-hooks/rules-of-hooks",
+    "findings": 15,
+    "fingerprint": "5360f2eb9fd1"
+  },
+  "session": {
+    "session_id": "269f7690891d4e72914a0793c974bf8f",
+    "status": "suspended",
+    "status_detail": "inactivity",
+    "acus_consumed": 0.0,
+    "pull_requests": [
+      {
+        "pr_url": "https://github.com/CognitionTakeHomeOrg/superset-adham-clone/pull/4",
+        "pr_state": "merged"
+      }
+    ],
+    "structured_output": {
+      "rationale": "TaskList early-returned on the GlobalTaskFramework feature-flag check before 15 hooks, making them conditional. Split into TaskListFeatureDisabled (the disabled-state branch), TaskListContent (all hooks, now unconditional), and a thin TaskList wrapper that performs the flag check and picks a component. Hook order is now stable per component and no side effect timing changed: useListViewResource still never runs when the flag is off because TaskListContent is simply not mounted. No lint-disable/@ts-ignore/config changes; only src/pages/TaskList/index.tsx touched. Verified: src/pages diagnostics for react-hooks/rules-of-hooks = 0, repo-wide = 32 (down from 47), npm run type passes (after npm run plugins:build, required for project references), and jest src/pages/TaskList passes 5/5 (the literal index.tsx pattern matches no test files).",
+      "gate_closed": true,
+      "files_changed": [
+        "superset-frontend/src/pages/TaskList/index.tsx"
+      ],
+      "blocked_reason": null,
+      "findings_fixed": 15,
+      "behavior_change": false,
+      "suppressions_added": false
+    },
+    "title": "[A1] react-hooks/rules-of-hooks in src/pages"
+  },
+  "messages": [
+    {
+      "source": "user",
+      "message": "## Repository\n\n`CognitionTakeHomeOrg/superset-adham-clone`, branched from `master` at `9f5611aca5425416d6eecd9ebe68fa3c865c4abe`.\n\nSuperset's own conventions are in `AGENTS.md` and `CLAUDE.md` at the repo root.\nRead them and follow them -- in particular: no `any` types, functional\ncomponents, and import UI components from `@superset-ui/core`.\n\n## Task\n\nThere are 15 `react-hooks/rules-of-hooks` violations in `src/pages` (1 files). This rule is\nchecked on every CI run and enforced on none of them, because `npm run lint`\npasses `--quiet`, which hides findings but still counts them.\n\n`superset-frontend/src/pages/TaskList/index.tsx`\n  line 120, col 7: React Hook \"useListViewResource\" is called conditionally. React Hooks must be called in the exact same order in every component render.\n  line 125, col 19: React Hook \"useMemo\" is called conditionally. React Hooks must be called in the exact same order in every component render.\n  line 128, col 49: React Hook \"useState\" is called conditionally. React Hooks must be called in the exact same order in every component render.\n  line 129, col 41: React Hook \"useState\" is called conditionally. React Hooks must be called in the exact same order in every component render.\n  line 132, col 34: React Hook \"useCallback\" is called conditionally. React Hooks must be called in the exact same order in every component render.\n  line 150, col 32: React Hook \"useCallback\" is called conditionally. React Hooks must be called in the exact same order in every component render.\n  line 159, col 28: React Hook \"useCallback\" is called conditionally. React Hooks must be called in the exact same order in every component render.\n  line 168, col 33: React Hook \"useCallback\" is called conditionally. React Hooks must be called in the exact same order in every component render.\n  line 185, col 33: React Hook \"useCallback\" is called conditionally. React Hooks must be called in the exact same order in every component render.\n  line 190, col 28: React Hook \"useCallback\" is called conditionally. React Hooks must be called in the exact same order in every component render.\n  line 223, col 27: React Hook \"useCallback\" is called conditionally. React Hooks must be called in the exact same order in every component render.\n  line 234, col 31: React Hook \"useCallback\" is called conditionally. React Hooks must be called in the exact same order in every component render.\n  line 243, col 34: React Hook \"useCallback\" is called conditionally. React Hooks must be called in the exact same order in every component render.\n  line 248, col 19: React Hook \"useMemo\" is called conditionally. React Hooks must be called in the exact same order in every component render.\n  line 538, col 36: React Hook \"useMemo\" is called conditionally. React Hooks must be called in the exact same order in every component render.\n\n## Definition of done\n\nRun these yourself and confirm each one before opening a pull request. All paths\nare relative to `superset-frontend/`. Use the lockfile-pinned binary at\n`./node_modules/.bin/oxlint`, **not** `npx` -- npx may resolve a different\nversion than the lockfile and give you a different answer than CI.\n\n```bash\ncd superset-frontend\n\n# 1. This area is clean.\n./node_modules/.bin/oxlint --config oxlint.json -A all -D react-hooks/rules-of-hooks --format json \\\n  | jq '[.diagnostics[] | select(.filename | startswith(\"src/pages/\"))] | length'\n# must print 0\n\n# 2. Nothing else regressed. The repo-wide count for this rule must be exactly\n#    32, down from 47. Higher means you broke something; lower means\n#    you changed files outside the scope of this task.\n./node_modules/.bin/oxlint --config oxlint.json -A all -D react-hooks/rules-of-hooks --format json \\\n  | jq '.diagnostics | length'\n\n# 3. Types still check.\nnpm run type\n\n# 4. Tests still pass for what you touched.\nnpm run test -- src/pages/TaskList/index.tsx\n```\n\n## Constraints\n\n- Do not fix a conditional hook by moving the condition inside the hook if that changes when effects fire. Preserve the existing behaviour or state the change.\n- Fix the cause, not the symptom.\n- Do not modify `oxlint.json`, and do not add any lint-disable or `@ts-ignore`\n  comment. Changing the rule's configuration is a failed session, not a fix.\n- Do not touch files outside `src/pages`.\n- If a correct fix requires changing runtime behaviour, make the change and state\n  it explicitly in the pull request body. Do not hide it.\n- **If you cannot fix something correctly, stop and explain why.** A blocked\n  session is a valid, expected outcome and a human will review it. A fix that\n  passes the linter while preserving the defect is not a valid outcome.\n\n## Pull request\n\nOpen a PR against `master` of `CognitionTakeHomeOrg/superset-adham-clone`. Follow `.github/PULL_REQUEST_TEMPLATE.md`\nand Conventional Commits, e.g. `fix(components): add stable keys to error message lists`.\nState in the body which of the four checks above you ran and what they printed.\n\n## Output\n\nConform to the provided structured output schema. `gate_closed` must be true only\nif check 1 actually printed 0 when you ran it.\n",
+      "created_at": 1785499555
+    },
+    {
+      "source": "devin",
+      "message": "Starting on the 15 rules-of-hooks violations in src/pages/TaskList/index.tsx.",
+      "created_at": 1785499562
+    },
+    {
+      "source": "devin",
+      "message": "Fixed by splitting `TaskList` into a flag-checking wrapper + `TaskListContent` (all hooks unconditional) + `TaskListFeatureDisabled`, so no behavior changes \u2014 the task fetch still doesn't happen when the flag is off. Checks: src/pages count 0, repo-wide 32, `npm run type` clean, `npm run test -- src/pages/TaskList` 5/5 (the literal `index.tsx` pattern matches no test files, so I ran the directory). PR: https://github.com/CognitionTakeHomeOrg/superset-adham-clone/pull/4\n[OFFER_TEST_APP]Test the Tasks page[/OFFER_TEST_APP]",
+      "created_at": 1785499994
+    }
+  ],
+  "final_status": "merged",
+  "pr_url": "https://github.com/CognitionTakeHomeOrg/superset-adham-clone/pull/4"
+}

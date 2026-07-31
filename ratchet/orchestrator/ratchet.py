@@ -3,9 +3,9 @@
 
 Cleanup decays. Someone clears every `jsx-key` violation in the repository, and
 six months later there are forty of them again, because nothing stopped them
-from coming back. The enforcement switch is what stops them, and flipping it is
-the entire point of the preceding work -- the pull requests are the means, this
-is the end.
+coming back. The enforcement switch is what stops them, and flipping it is the
+entire point of the preceding work -- the pull requests are the means, this is
+the end.
 
 A ratchet, mechanically, is a toothed wheel with a pawl that lets it turn one way
 only. That is the property being bought here: the count can go down, and cannot
@@ -13,17 +13,23 @@ go back up.
 
 Two modes:
 
-  full     -- the debt reached zero, so promote the rule to `error`. The class of
+  full     -- a gate reached zero, so promote the rule to `error`. The class of
               defect becomes impossible to reintroduce.
 
-  counting -- the debt did not reach zero, so freeze it. Today's count becomes a
-              committed baseline and CI fails any pull request that raises it.
-              Strictly weaker, but it still only turns one way, and it does not
-              require finishing first. This is what makes the approach apply to
-              the 557 `prefer-destructuring` findings nobody is ever going to
-              hand-fix.
+  counting -- it did not, so freeze it. Today's counts are committed as ceilings
+              and CI fails any pull request that raises one. Strictly weaker, but
+              it still only turns one way, and it does not require finishing
+              first. This is what makes the approach apply to the 197
+              `ban-ts-comment` findings nobody is ever going to hand-clear.
 
-    python ratchet.py --workstream C --mode full
+**This runs automatically.** The thesis is that cleanup fails because it depends
+on someone paying attention; a ratchet that a human has to remember to crank
+would reintroduce exactly that failure. So the PR is opened and kept up to date
+by the system, on every gate improvement -- and merged by a human, because
+turning on something that fails everyone's build is a policy decision.
+
+    python ratchet.py --auto            # what would change
+    python ratchet.py --auto --push     # open/update the PR
 """
 
 from __future__ import annotations
@@ -38,204 +44,321 @@ sys.path.insert(0, str(Path(__file__).parent))
 sys.path.insert(0, str(Path(__file__).parents[1] / "detector"))
 
 from devin import load_env  # noqa: E402
-from gates import assert_clean_tree, run_oxlint  # noqa: E402
+from gates import assert_clean_tree, run_mypy, run_oxlint  # noqa: E402
 
-RULES = {
-    "A": "react-hooks/rules-of-hooks",
-    "B": "react/no-unstable-nested-components",
-    "C": "react/jsx-key",
-    "D": "@typescript-eslint/ban-ts-comment",
+# Every gate, its committed baseline, and where its enforcement switch lives.
+GATES = {
+    "react-hooks/rules-of-hooks": {
+        "baseline": 47, "kind": "oxlint", "switch": '"warn"',
+        "note": "4 of these are false positives in playwright/ -- `use()` there is "
+                "Playwright's fixture callback, not React's hook",
+    },
+    "react/no-unstable-nested-components": {
+        "baseline": 150, "kind": "oxlint", "switch": '"warn"', "note": "",
+    },
+    "react/jsx-key": {
+        "baseline": 81, "kind": "oxlint", "switch": "absent, inherits default `warn`",
+        "note": "",
+    },
+    "@typescript-eslint/ban-ts-comment": {
+        "baseline": 197, "kind": "oxlint", "switch": '"off"', "note": "",
+    },
+    "unused-ignore": {
+        "baseline": 49, "kind": "mypy",
+        "switch": "8 modules exempted via `warn_unused_ignores = false`",
+        "note": "measured in the stub-only mypy environment pre-commit uses",
+    },
 }
 
-BASELINE = {"A": 47, "B": 150, "C": 81, "D": 197}
+BRANCH = "ratchet/counting-baseline"
 
-COUNTING_SCRIPT = """\
-#!/usr/bin/env node
-/*
- * Counting ratchet.
- *
- * Fails when a rule's finding count rises above the committed baseline. It does
- * not require the count to be zero, which is what makes it usable against debt
- * too large to ever hand-clear. The number in ratchet-baseline.json may be
- * lowered by any PR that reduces the debt; raising it requires a human to
- * deliberately edit a committed file, in a diff a reviewer will see.
- */
-const { execSync } = require('child_process');
-const fs = require('fs');
+CHECK_SCRIPT = '''#!/usr/bin/env python3
+"""Counting ratchet.
 
-const baseline = JSON.parse(fs.readFileSync(__dirname + '/ratchet-baseline.json', 'utf8'));
-let failed = false;
+Fails when any gate's finding count rises above its committed ceiling.
 
-for (const [rule, allowed] of Object.entries(baseline.rules)) {
-  const out = execSync(
-    `./node_modules/.bin/oxlint --config oxlint.json -A all -D ${rule} --format json`,
-    { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 },
-  );
-  const actual = JSON.parse(out).diagnostics.length;
-  const verdict = actual > allowed ? 'REGRESSION' : actual < allowed ? 'improved' : 'held';
-  console.log(`${rule}: ${actual} (baseline ${allowed}) ${verdict}`);
-  if (actual > allowed) {
-    console.error(
-      `  ${rule} rose by ${actual - allowed}. Fix the new findings, or lower the ` +
-      `baseline in ratchet-baseline.json if you are removing them.`,
-    );
-    failed = true;
-  }
-}
-process.exit(failed ? 1 : 0);
+It does not require the count to be zero, which is what makes it usable against
+debt too large to ever hand-clear. A pull request that reduces the debt may lower
+a ceiling freely. Raising one requires deliberately editing a committed file, in
+a diff a reviewer will see and have to approve.
+
+    python scripts/ratchet_check.py
+"""
+
+import json
+import pathlib
+import re
+import subprocess
+import sys
+
+ROOT = pathlib.Path(__file__).resolve().parents[1]
+BASELINE = json.loads((ROOT / "ratchet-baseline.json").read_text())
+
+# oxlint must run from superset-frontend/ with no path arguments, via the
+# lockfile-pinned binary. Naming paths under-reports -- rules-of-hooks is 47 at
+# CI scope and 43 if you pass `src packages plugins`, because playwright/ drops
+# out of the scan.
+FRONTEND = ROOT / "superset-frontend"
+OXLINT = "./node_modules/.bin/oxlint"
+
+# mypy's answer depends on what is installed. The gate is the isolated
+# environment pre-commit uses: mypy plus stub packages and nothing else. With
+# Superset's real dependencies installed the same commit reports 1,500+ errors
+# that have nothing to do with this check.
+MYPY_LINE = re.compile(r"^[^:]+:\\d+: error: .*\\[(?P<code>[\\w-]+)\\]$")
+
+
+def count_oxlint(rule):
+    out = subprocess.run(
+        [OXLINT, "--config", "oxlint.json", "-A", "all", "-D", rule, "--format", "json"],
+        cwd=FRONTEND, capture_output=True, text=True,
+    ).stdout
+    return len(json.loads(out).get("diagnostics", [])) if out.strip() else 0
+
+
+def count_mypy(code, mypy_bin):
+    out = subprocess.run(
+        [mypy_bin, "--config-file", str(ROOT / "ratchet-mypy.ini"),
+         "--check-untyped-defs", "--no-color-output", "--no-error-summary", "superset/"],
+        cwd=ROOT, capture_output=True, text=True,
+    ).stdout
+    return sum(1 for ln in out.splitlines()
+               if (m := MYPY_LINE.match(ln.strip())) and m.group("code") == code)
+
+
+def main():
+    mypy_bin = BASELINE.get("mypy_bin", "mypy")
+    failed = []
+    print(f"{'gate':<40} {'now':>6} {'ceiling':>8}   verdict")
+    print("-" * 72)
+    for gate, spec in sorted(BASELINE["gates"].items()):
+        ceiling = spec["ceiling"]
+        try:
+            now = count_oxlint(gate) if spec["kind"] == "oxlint" else count_mypy(gate, mypy_bin)
+        except Exception as e:
+            print(f"{gate:<40} {'?':>6} {ceiling:>8}   SKIPPED ({type(e).__name__})")
+            continue
+        if now > ceiling:
+            verdict, bad = f"REGRESSION +{now - ceiling}", True
+        elif now < ceiling:
+            verdict, bad = f"improved -{ceiling - now}", False
+        else:
+            verdict, bad = "held", False
+        print(f"{gate:<40} {now:>6} {ceiling:>8}   {verdict}")
+        if bad:
+            failed.append((gate, now, ceiling))
+
+    if failed:
+        print()
+        for gate, now, ceiling in failed:
+            print(f"error: {gate} rose from {ceiling} to {now}.", file=sys.stderr)
+        print("\\nFix the new findings, or -- if you are deliberately removing this "
+              "code -- lower the ceiling in ratchet-baseline.json.", file=sys.stderr)
+        return 1
+
+    print("\\nAll gates held or improved.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+'''
+
+WORKFLOW = """\
+# The ratchet.
+#
+# Superset already runs every one of these checks and enforces none of them --
+# `npm run lint` passes `--quiet`, which counts findings and discards them. This
+# job is what turns the count into a constraint.
+#
+# It does not demand zero. It demands "no worse than the committed ceiling",
+# which is a bar this repository can actually hold today.
+name: ratchet
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+jobs:
+  counting-ratchet:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: superset-frontend/.nvmrc
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: install frontend deps
+        working-directory: superset-frontend
+        run: npm ci --prefer-offline --no-audit
+      - name: install the mypy gate
+        # Stub packages only. Installing Superset's real dependencies here would
+        # change the answer -- see ratchet-mypy.ini.
+        run: |
+          python -m venv /tmp/mypy-gate
+          /tmp/mypy-gate/bin/pip install "mypy==1.15.0" \\
+            types-cachetools types-simplejson types-python-dateutil types-requests \\
+            types-pytz types-croniter types-PyYAML types-setuptools types-paramiko \\
+            types-Markdown
+      - name: ratchet
+        run: python scripts/ratchet_check.py
 """
 
 
 def sh(cmd: list[str], cwd: Path, check: bool = True) -> str:
-    return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, check=check).stdout
+    r = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
+    if check and r.returncode != 0:
+        raise RuntimeError(f"{' '.join(cmd[:3])}: {(r.stderr or r.stdout)[:300]}")
+    return r.stdout
+
+
+def measure(repo: Path) -> dict[str, int]:
+    counts = {}
+    for gate, spec in GATES.items():
+        counts[gate] = (len(run_oxlint(repo, gate)) if spec["kind"] == "oxlint"
+                        else len(run_mypy(repo)))
+    return counts
 
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--workstream", required=True, choices=sorted(RULES))
-    ap.add_argument("--mode", choices=["full", "counting", "auto"], default="auto")
-    ap.add_argument("--push", action="store_true", help="open the PR (default is dry run)")
+    ap.add_argument("--auto", action="store_true", help="freeze every improved gate")
+    ap.add_argument("--push", action="store_true", help="open/update the PR")
     args = ap.parse_args()
 
     root = Path(__file__).resolve().parents[2]
     env = load_env(root)
     repo_name = env["FORK_REPO"]
     repo = (root / "superset-adham-clone").resolve()
-    rule = RULES[args.workstream]
 
     assert_clean_tree(repo)
-    findings = run_oxlint(repo, rule)
-    n = len(findings)
-    before = BASELINE[args.workstream]
+    sh(["git", "fetch", "origin", "master"], repo)
+    sh(["git", "checkout", "-q", "master"], repo)
+    sh(["git", "reset", "--hard", "-q", "origin/master"], repo)
 
-    mode = args.mode
-    if mode == "auto":
-        mode = "full" if n == 0 else "counting"
+    counts = measure(repo)
+    improved = {g: c for g, c in counts.items() if c < GATES[g]["baseline"]}
+    closed = [g for g, c in counts.items() if c == 0]
 
-    print(f"{rule}: baseline {before} -> now {n}   mode={mode}")
-    if mode == "full" and n != 0:
-        print(f"REFUSING full ratchet: {n} findings remain. Promoting the rule to "
-              f"`error` would break the build on the first commit.", file=sys.stderr)
-        print("Use --mode counting to freeze the current count instead.", file=sys.stderr)
-        return 2
-    if n >= before and mode == "counting":
-        print(f"REFUSING: count did not improve ({before} -> {n}). "
-              f"A ratchet only turns one way.", file=sys.stderr)
-        return 2
+    print(f"{'gate':<40} {'baseline':>9} {'now':>6}   status")
+    print("-" * 74)
+    for gate, spec in GATES.items():
+        now, base = counts[gate], spec["baseline"]
+        status = ("CLOSED" if now == 0 else
+                  f"improved -{base - now}" if now < base else "unchanged")
+        print(f"{gate:<40} {base:>9} {now:>6}   {status}")
+
+    if not improved:
+        print("\nNo gate has improved. A ratchet only turns one way -- nothing to do.")
+        return 0
+    if closed:
+        print(f"\nNOTE: {', '.join(closed)} reached zero -- eligible for a FULL "
+              f"ratchet (promote to `error`). Run --mode full for those.")
 
     fe = repo / "superset-frontend"
-    branch = f"ratchet/{args.workstream.lower()}-{rule.split('/')[-1]}"
-    sh(["git", "checkout", "-B", branch, "master"], repo)
+    baseline_doc = {
+        "_comment": (
+            "Committed ceilings. Lower them freely in a PR that reduces debt. "
+            "Raising one is a deliberate, reviewable act."
+        ),
+        "measured_at": sh(["git", "rev-parse", "HEAD"], repo).strip(),
+        "mypy_bin": "/tmp/mypy-gate/bin/mypy",
+        "gates": {g: {"ceiling": c, "kind": GATES[g]["kind"]} for g, c in counts.items()},
+    }
 
-    if mode == "full":
-        cfg_path = fe / "oxlint.json"
-        cfg = json.loads(cfg_path.read_text())
-        cfg.setdefault("rules", {})[rule] = "error"
-        cfg_path.write_text(json.dumps(cfg, indent=2) + "\n")
-        title = f"ci: enforce {rule} (ratchet)"
-        body = f"""\
+    print(f"\nWould freeze {len(counts)} gates ({len(improved)} improved) on branch {BRANCH}")
+    if not args.push:
+        print("(dry run -- pass --push to open the PR)")
+        return 0
+
+    sh(["git", "checkout", "-B", BRANCH, "master"], repo)
+    (repo / "ratchet-baseline.json").write_text(json.dumps(baseline_doc, indent=2) + "\n")
+    (repo / "scripts").mkdir(exist_ok=True)
+    (repo / "scripts" / "ratchet_check.py").write_text(CHECK_SCRIPT)
+    (repo / "scripts" / "ratchet_check.py").chmod(0o755)
+    (repo / "ratchet-mypy.ini").write_text(
+        (Path(__file__).parents[1] / "gates" / "mypy-unused-ignore.ini").read_text())
+    (repo / ".github" / "workflows").mkdir(parents=True, exist_ok=True)
+    (repo / ".github" / "workflows" / "ratchet.yml").write_text(WORKFLOW)
+
+    rows = "\n".join(
+        f"| `{g}` | {GATES[g]['baseline']} | **{counts[g]}** | "
+        f"{'**-' + str(GATES[g]['baseline'] - counts[g]) + '**' if counts[g] < GATES[g]['baseline'] else '--'} | "
+        f"{GATES[g]['switch']} |"
+        for g in GATES
+    )
+    notes = "\n".join(f"- `{g}`: {GATES[g]['note']}" for g in GATES if GATES[g]["note"])
+
+    title = f"ci: freeze {len(counts)} quality gates at current counts (counting ratchet)"
+    body = f"""\
 ## SUMMARY
 
-Promotes `{rule}` from non-blocking to `error` in `superset-frontend/oxlint.json`.
+Commits the current finding count for every measured gate as a **ceiling**, and
+fails CI on any pull request that raises one.
 
-This rule has been checked on every CI run and enforced on none of them. `npm run
-lint` passes `--quiet`, which counts the findings and discards them -- the count
-appeared in {before} consecutive green builds without ever failing one.
+These rules are checked on every CI run and enforced on none of them. `npm run
+lint` passes `--quiet`, which counts findings and discards them -- the count has
+appeared in every green build without ever failing one.
 
-The {before} pre-existing violations have been cleared, so the switch can now be
-turned on. This is the change that makes the cleanup permanent: without it, the
-count grows back and the work is spent.
+Turning them into errors outright is not possible yet: findings remain, and the
+next person to push an unrelated typo fix would get a build failure with hundreds
+of errors that are not theirs. So this takes the weaker, available step. The
+count can go **down** freely. It cannot go **up**.
+
+| gate | baseline | ceiling | change | enforcement today |
+|---|---|---|---|---|
+{rows}
+
+{notes}
 
 ## BEFORE/AFTER
 
-- **Before:** `{rule}` — {before} findings, build green
-- **After:** `{rule}` — 0 findings, build **fails** on the next one introduced
+- **Before:** unbounded. Any PR could add findings, silently, forever.
+- **After:** capped. CI fails at ceiling + 1, naming the gate and the delta.
 
 ## TESTING INSTRUCTIONS
 
 ```bash
-cd superset-frontend
-./node_modules/.bin/oxlint --config oxlint.json -A all -D {rule} --format json \\
-  | jq '.diagnostics | length'   # 0
-npm run lint                      # passes, and now this is load-bearing
-```
-
-## ADDITIONAL INFORMATION
-
-- [ ] Has associated issue
-- [x] Required feature flags: none
-- [x] Changes UI: no
-- [x] Introduces new feature or API: no
-"""
-    else:
-        (fe / "ratchet-check.js").write_text(COUNTING_SCRIPT)
-        (fe / "ratchet-check.js").chmod(0o755)
-        bl_path = fe / "ratchet-baseline.json"
-        existing = json.loads(bl_path.read_text()) if bl_path.exists() else {"rules": {}}
-        existing["rules"][rule] = n
-        bl_path.write_text(json.dumps(existing, indent=2) + "\n")
-
-        pkg_path = fe / "package.json"
-        pkg = json.loads(pkg_path.read_text())
-        pkg["scripts"]["ratchet"] = "node ratchet-check.js"
-        pkg_path.write_text(json.dumps(pkg, indent=2) + "\n")
-
-        title = f"ci: freeze {rule} at {n} (counting ratchet)"
-        body = f"""\
-## SUMMARY
-
-Commits the current `{rule}` count as a ceiling and fails CI on any pull request
-that raises it.
-
-{before - n} of {before} findings have been cleared; {n} remain. Rather than wait
-for zero before turning on any enforcement at all, this locks in the progress
-already made. The number can be lowered by any PR that reduces the debt. Raising
-it requires deliberately editing a committed file, which a reviewer will see.
-
-This is the weaker form of the ratchet, and it is the one that generalises: it
-works against debt classes too large to ever hand-clear.
-
-## BEFORE/AFTER
-
-- **Before:** {before} findings, unbounded — any PR could add more, silently
-- **After:** {n} findings, capped — CI fails at {n + 1}
-
-## TESTING INSTRUCTIONS
-
-```bash
-cd superset-frontend
-npm run ratchet     # passes at {n}
+python scripts/ratchet_check.py     # passes at the committed ceilings
 ```
 
 Introduce one new violation and re-run; it fails and names the rule.
 
 ## ADDITIONAL INFORMATION
 
-- [ ] Has associated issue
+- [x] Has associated issue: the per-gate remediation issues in this repository
 - [x] Required feature flags: none
 - [x] Changes UI: no
 - [x] Introduces new feature or API: no
+
+---
+<sub>Opened automatically when a gate improved. Cleanup decays; the ceiling does
+not. Merging is a human decision -- this turns on a check that can fail
+everyone's build.</sub>
 """
 
-    diff = sh(["git", "diff", "--stat"], repo)
-    print("\n" + diff)
-
-    if not args.push:
-        sh(["git", "checkout", "master"], repo)
-        sh(["git", "checkout", "--", "."], repo)
-        sh(["git", "branch", "-D", branch], repo, check=False)
-        print("(dry run -- pass --push to open the PR)")
-        return 0
-
     sh(["git", "add", "-A"], repo)
-    sh(["git", "commit", "-m", title], repo)
-    sh(["git", "push", "-u", "origin", branch, "--force"], repo)
-    url = subprocess.run(
-        ["gh", "pr", "create", "--repo", repo_name, "--base", "master", "--head", branch,
-         "--title", title, "--body", body, "--label", "devin:ratchet"],
-        cwd=repo, capture_output=True, text=True, check=True).stdout.strip()
-    sh(["git", "checkout", "master"], repo)
-    print(f"opened {url}")
+    sh(["git", "-c", "user.name=debt-ratchet", "-c", "user.email=ratchet@local",
+        "commit", "-q", "-m", title], repo)
+    sh(["git", "push", "-q", "--force", "-u", "origin", BRANCH], repo)
+
+    existing = sh(["gh", "pr", "list", "--repo", repo_name, "--head", BRANCH,
+                   "--state", "open", "--json", "number", "--jq", ".[0].number"],
+                  repo, check=False).strip()
+    if existing:
+        sh(["gh", "pr", "edit", existing, "--repo", repo_name,
+            "--title", title, "--body", body], repo)
+        print(f"updated PR #{existing}")
+    else:
+        url = sh(["gh", "pr", "create", "--repo", repo_name, "--base", "master",
+                  "--head", BRANCH, "--title", title, "--body", body,
+                  "--label", "devin:ratchet"], repo).strip()
+        print(f"opened {url}")
+
+    sh(["git", "checkout", "-q", "master"], repo)
     return 0
 
 

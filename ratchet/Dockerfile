@@ -44,4 +44,9 @@ EXPOSE 8099
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s \
   CMD curl -fsS http://localhost:8099/health || exit 1
 
+# The node base image sets an ENTRYPOINT that execs node, so any argument passed
+# to `docker compose run` is handed to node rather than to the service -- which
+# fails with "node: bad option". Clearing it makes CMD authoritative and lets
+# `docker compose run --rm simulate --fast` behave the way it reads.
+ENTRYPOINT []
 CMD ["python3", "/app/orchestrator/webhook.py"]

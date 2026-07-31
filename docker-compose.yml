@@ -43,11 +43,11 @@ services:
     build: ./ratchet
     profiles: ["simulate"]
     command: ["python3", "/app/orchestrator/simulate.py"]
+    # No env_file. The absence of credentials is the point of this profile, and
+    # simulate.py asserts it rather than trusting the compose file.
+    tty: true
     volumes:
       - ./ratchet/fixtures:/app/fixtures:ro
       - ./baseline:/app/baseline:ro
     environment:
-      # No API key is read in this profile. The absence is the point: a reviewer
-      # can run the whole pipeline against recorded sessions with no credentials
-      # and no spend.
-      SIMULATE: "1"
+      FIXTURES_DIR: /app/fixtures

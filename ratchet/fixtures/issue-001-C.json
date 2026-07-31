@@ -1,0 +1,59 @@
+{
+  "issue_number": 1,
+  "unit": {
+    "workstream": "C",
+    "area": "src/components",
+    "rule": "react/jsx-key",
+    "findings": 4,
+    "fingerprint": "5740d1712cfc"
+  },
+  "session": {
+    "session_id": "15f207f081b64b6daa09a6a5ea360c55",
+    "status": "suspended",
+    "status_detail": "inactivity",
+    "acus_consumed": 0.0,
+    "pull_requests": [
+      {
+        "pr_url": "https://github.com/CognitionTakeHomeOrg/superset-adham-clone/pull/2",
+        "pr_state": "merged"
+      }
+    ],
+    "structured_output": {
+      "rationale": "Both files rendered issue_codes via .map().reduce((prev, curr) => [prev, <br />, curr]), producing nested unkeyed element arrays (4 react/jsx-key violations). issue_codes[].code is a stable unique identifier (used by IssueCode to build the docs URL), so the lists were rewritten with flatMap keyed on issueCode.code and `br-${issueCode.code}` for the separators, matching the existing DatabaseErrorMessage pattern in the same directory. No index keys, no lint-disable/ts-ignore, no oxlint.json change, nothing touched outside src/components. Verified: check 1 printed 0; check 2 printed 77; tests 11 passed in 2 suites (the given .tsx paths match no Jest testRegex, so the .test.tsx paths were used); npm run type fails with 68 pre-existing TS6305 errors from unbuilt deckgl plugins (npm run plugins:build fails on a pre-existing TS2352 in preset-chart-deckgl) \u2014 identical 68 errors on unmodified master, none referencing src/components. Behavior change: TimeoutErrorMessage previously threw a TypeError when issue_codes was empty (reduce with no initial value); it now renders nothing. Stated explicitly in the PR body.",
+      "gate_closed": true,
+      "files_changed": [
+        "superset-frontend/src/components/ErrorMessage/ParameterErrorMessage.tsx",
+        "superset-frontend/src/components/ErrorMessage/TimeoutErrorMessage.tsx"
+      ],
+      "blocked_reason": null,
+      "findings_fixed": 4,
+      "behavior_change": true,
+      "suppressions_added": false
+    },
+    "title": "[C5] react/jsx-key in src/components"
+  },
+  "messages": [
+    {
+      "source": "user",
+      "message": "## Repository\n\n`CognitionTakeHomeOrg/superset-adham-clone`, branched from `master` at `9f5611aca5425416d6eecd9ebe68fa3c865c4abe`.\n\nSuperset's own conventions are in `AGENTS.md` and `CLAUDE.md` at the repo root.\nRead them and follow them -- in particular: no `any` types, functional\ncomponents, and import UI components from `@superset-ui/core`.\n\n## Task\n\nThere are 4 `react/jsx-key` violations in `src/components` (2 files). This rule is\nchecked on every CI run and enforced on none of them, because `npm run lint`\npasses `--quiet`, which hides findings but still counts them.\n\n`superset-frontend/src/components/ErrorMessage/ParameterErrorMessage.tsx`\n  line 109, col 14: Missing \"key\" prop for element in iterator.\n  line 110, col 45: Missing \"key\" prop for element in array.\n\n`superset-frontend/src/components/ErrorMessage/TimeoutErrorMessage.tsx`\n  line 66, col 12: Missing \"key\" prop for element in iterator.\n  line 67, col 43: Missing \"key\" prop for element in array.\n\n## Definition of done\n\nRun these yourself and confirm each one before opening a pull request. All paths\nare relative to `superset-frontend/`. Use the lockfile-pinned binary at\n`./node_modules/.bin/oxlint`, **not** `npx` -- npx may resolve a different\nversion than the lockfile and give you a different answer than CI.\n\n```bash\ncd superset-frontend\n\n# 1. This area is clean.\n./node_modules/.bin/oxlint --config oxlint.json -A all -D react/jsx-key --format json \\\n  | jq '[.diagnostics[] | select(.filename | startswith(\"src/components/\"))] | length'\n# must print 0\n\n# 2. Nothing else regressed. The repo-wide count for this rule must be exactly\n#    77, down from 81. Higher means you broke something; lower means\n#    you changed files outside the scope of this task.\n./node_modules/.bin/oxlint --config oxlint.json -A all -D react/jsx-key --format json \\\n  | jq '.diagnostics | length'\n\n# 3. Types still check.\nnpm run type\n\n# 4. Tests still pass for what you touched.\nnpm run test -- src/components/ErrorMessage/ParameterErrorMessage.tsx src/components/ErrorMessage/TimeoutErrorMessage.tsx\n```\n\n## Constraints\n\n- **`key={index}` is not an acceptable fix.** Keying by array position is the precise behaviour this rule exists to prevent: when the list is reordered or filtered, React reuses the wrong DOM node and renders stale content against the wrong label. Find a stable unique identifier in the data being mapped and key on that. If no stable identifier exists, say so rather than falling back to the index.\n- Fix the cause, not the symptom.\n- Do not modify `oxlint.json`, and do not add any lint-disable or `@ts-ignore`\n  comment. Changing the rule's configuration is a failed session, not a fix.\n- Do not touch files outside `src/components`.\n- If a correct fix requires changing runtime behaviour, make the change and state\n  it explicitly in the pull request body. Do not hide it.\n- **If you cannot fix something correctly, stop and explain why.** A blocked\n  session is a valid, expected outcome and a human will review it. A fix that\n  passes the linter while preserving the defect is not a valid outcome.\n\n## Pull request\n\nOpen a PR against `master` of `CognitionTakeHomeOrg/superset-adham-clone`. Follow `.github/PULL_REQUEST_TEMPLATE.md`\nand Conventional Commits, e.g. `fix(components): add stable keys to error message lists`.\nState in the body which of the four checks above you ran and what they printed.\n\n## Output\n\nConform to the provided structured output schema. `gate_closed` must be true only\nif check 1 actually printed 0 when you ran it.\n",
+      "created_at": 1785497505
+    },
+    {
+      "source": "devin",
+      "message": "On it \u2014 reading the two ErrorMessage components and finding stable keys.",
+      "created_at": 1785497517
+    },
+    {
+      "source": "devin",
+      "message": "Fixed and PR opened: https://github.com/CognitionTakeHomeOrg/superset-adham-clone/pull/2\n\nKeyed the `issue_codes` lists on `issueCode.code` (stable unique id) via `flatMap`, matching the existing `DatabaseErrorMessage` pattern; no index keys, no suppressions. Checks: gate 1 printed 0, repo-wide count 77, tests 11 passed. `npm run type` shows 68 pre-existing `TS6305` errors from unbuilt deckgl plugins \u2014 identical on unmodified master, none in `src/components`. One behavior change, stated in the PR body: `TimeoutErrorMessage` with empty `issue_codes` previously threw (`reduce` on empty array) and now renders nothing.\n[OFFER_TEST_APP]Test error messages UI[/OFFER_TEST_APP]",
+      "created_at": 1785498036
+    },
+    {
+      "source": "devin",
+      "message": "Noted \u2014 PR #2 merged. Any further work will go on a fresh branch off master.",
+      "created_at": 1785498591
+    }
+  ],
+  "final_status": "merged",
+  "pr_url": "https://github.com/CognitionTakeHomeOrg/superset-adham-clone/pull/2"
+}

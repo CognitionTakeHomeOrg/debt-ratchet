@@ -1,0 +1,53 @@
+{
+  "issue_number": 5,
+  "unit": {
+    "workstream": "E",
+    "area": "superset/semantic_layers",
+    "rule": "unused-ignore",
+    "findings": 6,
+    "fingerprint": "cc1a2789a25f"
+  },
+  "session": {
+    "session_id": "1229e51264ed44a8aa274d5086caddb6",
+    "status": "running",
+    "status_detail": "waiting_for_user",
+    "acus_consumed": 0.0,
+    "pull_requests": [
+      {
+        "pr_url": "https://github.com/CognitionTakeHomeOrg/superset-adham-clone/pull/6",
+        "pr_state": "merged"
+      }
+    ],
+    "structured_output": {
+      "rationale": "PR #6 merged. All 6 dead '# type: ignore' comments in superset/semantic_layers/api.py were confirmed dead under the specified isolated gate (mypy 1.15.0 + 10 stub packages, /tmp/gate.ini) and removed. Check 1 printed 0; check 2 printed 43 (down from 49); check 3 printed 0, proving none were load-bearing; pytest tests/unit_tests/ -q: 11368 passed, 4 skipped, 2 xfailed. No new ignores, no Any widening, no pyproject.toml edits, no files touched outside superset/semantic_layers.",
+      "gate_closed": true,
+      "files_changed": [
+        "superset/semantic_layers/api.py"
+      ],
+      "blocked_reason": null,
+      "findings_fixed": 6,
+      "behavior_change": false,
+      "suppressions_added": false
+    },
+    "title": "[E2] unused-ignore in superset/semantic_layers"
+  },
+  "messages": [
+    {
+      "source": "user",
+      "message": "## Repository\n\n`CognitionTakeHomeOrg/superset-adham-clone`, branched from `master` at `9f5611aca5425416d6eecd9ebe68fa3c865c4abe`.\n\nSuperset's Python conventions are in `AGENTS.md` and `CLAUDE.md` at the repo root.\n\n## Task\n\n`superset/semantic_layers` contains 6 **dead `# type: ignore` comments** -- suppressions for type\nerrors that no longer occur. Each one is a silent liability: it suppresses not\nonly the error it was written for, but any future error on that line.\n\nThey are invisible today because `pyproject.toml` switches the check off for the\nmodules that contain them:\n\n```toml\n# Disable warn_unused_ignores for modules with dynamic type assignments\n[[tool.mypy.overrides]]\nmodule = [ ... superset.semantic_layers ... ]\nwarn_unused_ignores = false\n```\n\n`superset/semantic_layers/api.py`\n  line 569: Unused \"type: ignore\" comment\n  line 684: Unused \"type: ignore\" comment\n  line 964: Unused \"type: ignore\" comment\n  line 1040: Unused \"type: ignore\" comment\n  line 1057: Unused \"type: ignore\" comment\n  line 1096: Unused \"type: ignore\" comment\n\n## Definition of done\n\n### \u26a0\ufe0f Read this first -- mypy's answer depends on what is installed\n\nSuperset's pre-commit runs mypy in an **isolated environment containing mypy and\nten stub packages and nothing else**. In that environment master is clean across\n1,423 files. If you install Superset's real dependencies, the same command on the\nsame commit reports over 1,500 errors that have nothing to do with this task.\n\n**Both numbers are real. Only the isolated one is the gate**, because that is what\nCI runs. Build it exactly like this and use it for every check below:\n\n```bash\npython3.11 -m venv /tmp/mypy-gate\n/tmp/mypy-gate/bin/pip install \"mypy==1.15.0\" \\\n  types-cachetools types-simplejson types-python-dateutil types-requests \\\n  types-pytz types-croniter types-PyYAML types-setuptools types-paramiko \\\n  types-Markdown\n```\n\n### The checks\n\nThe gate config is `pyproject.toml`'s mypy settings with exactly one change: the\n`warn_unused_ignores = false` override is removed. Write it verbatim to\n`/tmp/gate.ini` -- do not regenerate it, the point is that it differs from the\nrepo's real settings in one variable and nothing else:\n\n```bash\ncat > /tmp/gate.ini <<'GATE_INI'\n[mypy]\ncheck_untyped_defs = True\ndisallow_any_generics = True\ndisallow_untyped_calls = True\ndisallow_untyped_defs = True\nignore_missing_imports = True\nno_implicit_optional = True\nwarn_unused_ignores = True\n\n\n[mypy-superset.migrations.versions.*]\nignore_errors = True\n\n[mypy-tests.*]\ncheck_untyped_defs = False\ndisallow_untyped_calls = False\ndisallow_untyped_defs = False\ndisable_error_code = annotation-unchecked\n\n[mypy-cryptography.*]\nignore_errors = True\nfollow_imports = skip\n\n[mypy-superset_core.*]\nfollow_imports = skip\nGATE_INI\n```\n\n```bash\n\n# 1. No dead ignores remain in superset/semantic_layers.\n/tmp/mypy-gate/bin/mypy --config-file /tmp/gate.ini --check-untyped-defs superset/ \\\n  2>&1 | grep '\\[unused-ignore\\]' | grep '^superset/semantic_layers' | wc -l\n# must print 0\n\n# 2. Nothing else regressed. Repo-wide unused-ignore count must be exactly\n#    43, down from 49.\n/tmp/mypy-gate/bin/mypy --config-file /tmp/gate.ini --check-untyped-defs superset/ \\\n  2>&1 | grep -c '\\[unused-ignore\\]'\n\n# 3. No NEW errors of any other kind. This is the one that catches a bad fix:\n#    deleting an ignore that was actually load-bearing turns one dead comment\n#    into one real type error.\n/tmp/mypy-gate/bin/mypy --config-file /tmp/gate.ini --check-untyped-defs superset/ \\\n  2>&1 | grep -v '\\[unused-ignore\\]' | grep -c 'error:'\n# must print 0\n\n# 4. Tests still pass for what you touched.\npytest tests/unit_tests/ -q\n```\n\n## Constraints\n\n- **Deleting the comment is usually right, but verify it -- do not assume.** An\n  ignore reported as unused under this config may still be doing work under a\n  different one. Check 3 exists precisely to catch that.\n- Do not add `# type: ignore` anywhere, and do not widen a type to `Any` to make\n  an error go away. Both are the same failure as the comment you are removing.\n- Do not edit `pyproject.toml`. Changing the gate's configuration is a failed\n  session, not a fix. Removing the override is a separate, deliberate change that\n  happens only after this work lands.\n- Do not touch files outside `superset/semantic_layers`.\n- **If you cannot fix something correctly, stop and explain why.** A blocked\n  session is a valid, expected outcome and a human will review it. If a\n  suppression is load-bearing and removing it requires a design change, say so\n  rather than forcing it.\n\n## Pull request\n\nOpen a PR against `master` of `CognitionTakeHomeOrg/superset-adham-clone`, Conventional Commits, e.g.\n`chore(types): remove dead type-ignore comments in superset/semantic_layers`. State which checks you\nran and what they printed.\n\n## Output\n\nConform to the provided structured output schema. `gate_closed` must be true only\nif check 1 actually printed 0 when you ran it.\n",
+      "created_at": 1785500947
+    },
+    {
+      "source": "devin",
+      "message": "On it \u2014 building the isolated mypy gate and removing the 6 dead ignores in superset/semantic_layers.",
+      "created_at": 1785500952
+    },
+    {
+      "source": "devin",
+      "message": "Done: https://github.com/CognitionTakeHomeOrg/superset-adham-clone/pull/6 \u2014 removed all 6 dead ignores in `superset/semantic_layers/api.py`. Gate results: check 1 = 0, check 2 = 43 (was 49), check 3 = 0, and `pytest tests/unit_tests/ -q` = 11368 passed / 4 skipped / 2 xfailed. No new ignores, no `Any`, no `pyproject.toml` change.\n\nThis is a comment-only type-checking change with no runtime behavior, so end-to-end app testing isn't meaningful here \u2014 but I can have the testing agent boot Superset and exercise the semantic-layers API endpoints if you want extra assurance.\n[OFFER_TEST_APP]Test semantic layers API[/OFFER_TEST_APP]",
+      "created_at": 1785502770
+    }
+  ],
+  "final_status": "merged",
+  "pr_url": "https://github.com/CognitionTakeHomeOrg/superset-adham-clone/pull/6"
+}
