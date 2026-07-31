@@ -40,7 +40,7 @@ jobs:
       # should not silence the oxlint ones.
       fail-fast: false
       matrix:
-        workstream: ${{ github.event_name == 'workflow_dispatch' && fromJSON(format('["{0}"]', inputs.workstream)) || fromJSON('["A","C","D","E","G"]') }}
+        workstream: ${{ github.event_name == 'workflow_dispatch' && fromJSON(format('["{0}"]', inputs.workstream)) || fromJSON('["A","B","C","D","E","G"]') }}
     steps:
       - name: check out the automation
         uses: actions/checkout@v4
