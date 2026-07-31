@@ -17,11 +17,11 @@ on:
   workflow_dispatch:
     inputs:
       workstream:
-        description: "A=rules-of-hooks B=unstable-components C=jsx-key D=ban-ts-comment E=mypy"
+        description: "A=rules-of-hooks B=unstable-components C=jsx-key D=ban-ts-comment E=mypy G=prefer-function-component"
         required: true
         default: "C"
         type: choice
-        options: ["A", "B", "C", "D", "E"]
+        options: ["A", "B", "C", "D", "E", "G"]
       apply:
         description: "File issues (unchecked = dry run)"
         required: false
@@ -40,7 +40,7 @@ jobs:
       # should not silence the oxlint ones.
       fail-fast: false
       matrix:
-        workstream: ${{ github.event_name == 'workflow_dispatch' && fromJSON(format('["{0}"]', inputs.workstream)) || fromJSON('["A","C","D","E"]') }}
+        workstream: ${{ github.event_name == 'workflow_dispatch' && fromJSON(format('["{0}"]', inputs.workstream)) || fromJSON('["A","C","D","E","G"]') }}
     steps:
       - name: check out the automation
         uses: actions/checkout@v4
