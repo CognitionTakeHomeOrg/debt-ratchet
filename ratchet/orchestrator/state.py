@@ -8,6 +8,7 @@ allocation by accident.
 
 from __future__ import annotations
 
+import os
 import sqlite3
 from pathlib import Path
 
@@ -44,7 +45,14 @@ LATE_COLUMNS = {
 
 
 def connect(root: Path) -> sqlite3.Connection:
-    con = sqlite3.connect(root / "ratchet" / "state.db")
+    # STATE_DB lets the container put the ledger on a named volume instead of a
+    # bind-mounted host file. Bind-mounting a file that does not exist yet makes
+    # Docker create a *directory* at that path, and the first clone of this repo
+    # correctly has no state.db -- so the documented `docker compose up` failed
+    # with "unable to open database file" on every fresh checkout.
+    db = Path(os.environ["STATE_DB"]) if os.environ.get("STATE_DB") else root / "ratchet" / "state.db"
+    db.parent.mkdir(parents=True, exist_ok=True)
+    con = sqlite3.connect(db)
     con.row_factory = sqlite3.Row
     con.executescript(SCHEMA)
     existing = {r["name"] for r in con.execute("PRAGMA table_info(sessions)")}

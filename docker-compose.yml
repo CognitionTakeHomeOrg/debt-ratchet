@@ -1,12 +1,11 @@
-# docker compose up
+# Two ways in:
 #
-# Two profiles, because a reviewer without a Devin API key must still be able to
-# watch the system work:
+#   docker compose run --rm simulate    no key, no network, no spend, no setup
+#   docker compose up                   the real thing -- needs a Devin key and
+#                                       a checkout of the repo under measurement
 #
-#   default   the real thing -- receives GitHub webhooks, spends ACUs
-#   simulate  replays recorded sessions from ratchet/fixtures/, spends nothing
-#
-#   docker compose --profile simulate up
+# `simulate` deliberately mounts nothing and reads no credentials, so it works
+# from a bare clone on any machine. See the README's Quickstart for `up`.
 
 services:
   orchestrator:
@@ -36,55 +35,52 @@ services:
     ports:
       - "8099:8099"
     volumes:
-      # The repository under measurement. Read-only: this container measures the
-      # tree, it never edits it -- everything that changes code goes through a
-      # Devin session and a reviewable pull request.
-      - ./superset-adham-clone:/repo:ro
-      # State outlives the container. The ACU ledger is the reason: an
-      # orchestrator that forgets what it spent is not a budget control.
-      - ./ratchet/state.db:/app/state.db
+      # The repository under measurement -- a separate clone, because this repo
+      # measures Superset rather than living inside it. It must exist before
+      # `up`: Docker cannot bind-mount a path that is not there, and would
+      # otherwise create an empty directory and measure nothing.
+      - "${FORK_PATH:-./superset-adham-clone}:/repo:ro"
+      - ratchet-state:/app/state
       - ./baseline:/app/baseline:ro
     restart: unless-stopped
 
   dashboard:
     build: ./ratchet
-    # Deliberately NOT `env_file: .env`.
+    # Deliberately NOT `env_file: .env` -- see the note on `orchestrator`.
     #
-    # `env_file` makes the file mandatory, so a fresh clone -- which correctly
-    # has no .env -- fails to parse before any service starts, including
-    # simulate, which needs no credentials at all. Compose already reads .env
-    # from the project directory for ${VAR} interpolation, and its absence there
-    # is not an error. The `:-` defaults keep it valid either way.
-    #
-    # The long-form `env_file: [{path, required: false}]` would also work but
-    # needs Compose v2.24+; this is portable.
+    # No /repo mount: the dashboard reads the ledger and the committed baselines,
+    # never the tree under measurement. That also means `docker compose up
+    # dashboard` works on a bare clone, with or without a fork checkout.
     environment:
       DEVIN_API_KEY: "${DEVIN_API_KEY:-}"
       DEVIN_ORG_ID: "${DEVIN_ORG_ID:-}"
       DEVIN_API_BASE: "${DEVIN_API_BASE:-https://api.devin.ai/v3}"
       FORK_REPO: "${FORK_REPO:-}"
       BASELINE_SHA: "${BASELINE_SHA:-9f5611aca5425416d6eecd9ebe68fa3c865c4abe}"
-      GITHUB_WEBHOOK_SECRET: "${GITHUB_WEBHOOK_SECRET:-}"
       MAX_ACU_PER_SESSION: "${MAX_ACU_PER_SESSION:-10}"
       GLOBAL_ACU_CEILING: "${GLOBAL_ACU_CEILING:-250}"
       MAX_CONCURRENT_SESSIONS: "${MAX_CONCURRENT_SESSIONS:-4}"
-    command: ["python3", "/app/orchestrator/dashboard.py"]
+    command: ["python3", "/app/ratchet/orchestrator/dashboard.py"]
     ports:
       - "8100:8100"
     volumes:
-      - ./ratchet/state.db:/app/state.db
+      - ratchet-state:/app/state
       - ./baseline:/app/baseline:ro
     restart: unless-stopped
 
   simulate:
     build: ./ratchet
     profiles: ["simulate"]
-    command: ["python3", "/app/orchestrator/simulate.py"]
-    # No env_file. The absence of credentials is the point of this profile, and
-    # simulate.py asserts it rather than trusting the compose file.
+    command: ["python3", "/app/ratchet/orchestrator/simulate.py"]
+    # No volumes and no env_file, on purpose. The fixtures are baked into the
+    # image, so this runs identically from a bare clone on any machine -- and
+    # the absence of credentials is the point of this profile, which
+    # simulate.py asserts rather than trusting the compose file.
     tty: true
-    volumes:
-      - ./ratchet/fixtures:/app/fixtures:ro
-      - ./baseline:/app/baseline:ro
-    environment:
-      FIXTURES_DIR: /app/fixtures
+
+volumes:
+  # The ACU ledger outlives the container: an orchestrator that forgets what it
+  # spent is not a budget control. A named volume rather than a bind mount --
+  # Docker turns a bind mount of a not-yet-existent file into a directory, and
+  # sqlite cannot open a directory.
+  ratchet-state:

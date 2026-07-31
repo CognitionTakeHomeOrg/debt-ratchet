@@ -66,9 +66,26 @@ BASELINE = {
 USD_PER_ACU = 2.25
 
 
+# A clean clone has an empty ledger, so every panel would read zero -- which
+# tells a reviewer nothing about a system whose whole point is what it did.
+# `ledger.json` is the recorded result of the real runs, the same provenance as
+# the simulate fixtures. It is used only when the live ledger is empty, and the
+# page says which of the two it is rather than letting recorded data pass as live.
+LEDGER_SNAPSHOT = ROOT / "ratchet" / "fixtures" / "ledger.json"
+
+
 def snapshot() -> dict:
     con = state.connect(ROOT)
     rows = [dict(r) for r in con.execute("SELECT * FROM sessions ORDER BY created_at DESC")]
+
+    recorded = False
+    if not rows and LEDGER_SNAPSHOT.exists():
+        rows = sorted(
+            json.loads(LEDGER_SNAPSHOT.read_text()),
+            key=lambda r: r["created_at"],
+            reverse=True,
+        )
+        recorded = True
 
     merged = [r for r in rows if r["status"] == "merged"]
     escalated = [r for r in rows if r["status"] == "escalated"]
@@ -116,6 +133,7 @@ def snapshot() -> dict:
 
     return {
         "generated": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+        "source": "recorded" if recorded else "live",
         "gates_closed": sum(1 for g in gates if g["closed"]),
         "gates_total": len(gates),
         "gates": gates,
@@ -215,7 +233,8 @@ def render(d: dict) -> str:
 <title>Debt ratchet</title><meta http-equiv="refresh" content="20">
 <style>{STYLE}</style></head><body>
 <h1>Debt ratchet &mdash; {ENV["FORK_REPO"]}</h1>
-<div class="sub">baseline {ENV["BASELINE_SHA"][:10]} &nbsp;·&nbsp; {d["generated"]} &nbsp;·&nbsp; refreshes every 20s</div>
+<div class="sub">baseline {ENV["BASELINE_SHA"][:10]} &nbsp;·&nbsp; {d["generated"]} &nbsp;·&nbsp; refreshes every 20s
+{'&nbsp;·&nbsp; <b>recorded results</b> — this ledger is empty, so the page is showing the committed snapshot of the real runs' if d["source"] == "recorded" else ""}</div>
 <div class="grid">{cards}</div>
 
 <table><tr><th>Gate</th><th>Cleared</th><th>Burndown</th><th>Remaining</th><th>Enforcement</th></tr>

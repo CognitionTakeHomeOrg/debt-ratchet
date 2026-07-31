@@ -33,12 +33,23 @@ RUN python3 -m venv /opt/mypy-gate \
          types-Markdown
 
 WORKDIR /app
-COPY detector/ /app/detector/
-COPY orchestrator/ /app/orchestrator/
+# Mirror the repository layout under /app rather than flattening it.
+#
+# The modules locate their siblings with `Path(__file__).resolve().parents[2]`,
+# which is the repo root when the tree is `<root>/ratchet/orchestrator/x.py`.
+# Copying to `/app/orchestrator/` instead made that resolve to `/`, so the
+# orchestrator looked for `/ratchet/state.db` and `/baseline` while compose
+# mounted them at `/app/...`: sqlite3.OperationalError, and a dashboard reading
+# an empty ledger. Keeping the `ratchet/` level costs nothing and makes the
+# in-container paths identical to the ones used outside it.
+COPY detector/ /app/ratchet/detector/
+COPY orchestrator/ /app/ratchet/orchestrator/
+COPY fixtures/ /app/ratchet/fixtures/
 
 ENV PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app/detector:/app/orchestrator \
-    MYPY_GATE=/opt/mypy-gate/bin/mypy
+    PYTHONPATH=/app/ratchet/detector:/app/ratchet/orchestrator \
+    MYPY_GATE=/opt/mypy-gate/bin/mypy \
+    STATE_DB=/app/state/state.db
 
 EXPOSE 8099
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s \
@@ -49,4 +60,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=5s \
 # fails with "node: bad option". Clearing it makes CMD authoritative and lets
 # `docker compose run --rm simulate --fast` behave the way it reads.
 ENTRYPOINT []
-CMD ["python3", "/app/orchestrator/webhook.py"]
+CMD ["python3", "/app/ratchet/orchestrator/webhook.py"]

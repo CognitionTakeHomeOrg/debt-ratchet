@@ -82,26 +82,59 @@ python ratchet/detector/upstream_metric.py --refresh
 
 ## Quickstart
 
+**Start here.** No API key, no credentials, no setup beyond the clone:
+
 ```bash
-git clone <this repo> && cd debt-ratchet
-cp .env.example .env          # add DEVIN_API_KEY, DEVIN_ORG_ID, FORK_REPO
+git clone https://github.com/CognitionTakeHomeOrg/debt-ratchet
+cd debt-ratchet
+docker compose run --rm simulate
+```
+
+`run` rather than `up`, so only this service starts. It mounts nothing and reads
+no environment: the fixtures are baked into the image, so it behaves identically
+on any machine. Runtime is about a minute; add `--fast` to skip the pacing.
+
+Simulate replays the recorded sessions behind the merged pull requests below,
+narrating the orchestrator's real decision sequence: detect → file → launch →
+Devin works → structured report → independent verification → human merges. The
+fixtures in `ratchet/fixtures/` are **recorded API responses and message streams
+from those actual runs**, not synthetic data. `simulate.py` refuses to touch a
+credential even if one is present in the environment.
+
+### The dashboard
+
+```bash
+docker compose up dashboard          # → http://localhost:8100
+```
+
+Needs no key and no fork checkout. A fresh clone has an empty ledger, so the
+page falls back to `ratchet/fixtures/ledger.json` — the committed record of the
+real runs — and labels itself **recorded results** while it does. Once the
+orchestrator has run for real, the same page reads live from SQLite and the
+label disappears. JSON at `/metrics.json`.
+
+### The full system
+
+Two prerequisites, and both are load-bearing:
+
+```bash
+# 1. the repository under measurement -- a separate clone, because this repo
+#    measures Superset rather than living inside it
+git clone https://github.com/CognitionTakeHomeOrg/superset-adham-clone
+git -C superset-adham-clone checkout 9f5611aca5
+
+# 2. credentials
+cp .env.example .env      # DEVIN_API_KEY, DEVIN_ORG_ID, FORK_REPO, GITHUB_WEBHOOK_SECRET
+
 docker compose up
 ```
 
 - Dashboard → <http://localhost:8100>
 - Webhook receiver → <http://localhost:8099/webhook>, health at `/health`
 
-### No API key? Run it anyway
-
-```bash
-docker compose run --rm simulate
-```
-
-**Start here if you are evaluating this.** `run` rather than `up`, so only this
-service starts — the orchestrator and dashboard are not brought up, and no
-credentials are needed or read. Simulate mode replays the three sessions that produced the three merged pull requests below, narrating the orchestrator's real decision sequence: detect → file → launch → Devin works → structured report → independent verification → human merges.
-
-The fixtures in `ratchet/fixtures/` are **recorded API responses and message streams from those actual runs** — not synthetic data. No credentials are read: `simulate.py` refuses to touch a credential even if one is present in the environment.
+The checkout must exist before `up`: Docker cannot bind-mount a path that is not
+there. Set `FORK_PATH` if you keep it somewhere else. This is the only step that
+spends money — the budget controls are enforced before any session is created.
 
 ---
 
@@ -111,17 +144,24 @@ Against [`CognitionTakeHomeOrg/superset-adham-clone`](https://github.com/Cogniti
 
 | Issue | Gate | Unit | PR | Findings | Result |
 |---|---|---|---|---|---|
-| #1 | `react/jsx-key` | `src/components` | #2 | 4 | 81 → **77** |
-| #3 | `react-hooks/rules-of-hooks` | `src/pages` | #4 | 15 | 47 → **32** |
-| #5 | mypy `unused-ignore` | `superset/semantic_layers` | #6 | 6 | 49 → **43** |
+| #1 | `react/jsx-key` | `src/components` | #2 | 4 | 81 → **77** · merged |
+| #3 | `react-hooks/rules-of-hooks` | `src/pages` | #4 | 15 | 47 → **32** · merged |
+| #5 | mypy `unused-ignore` | `superset/semantic_layers` | #6 | 6 | 49 → **43** · merged |
+| #8 | `react/no-unstable-nested-components` | `src/dashboard` | #11 | 18 | 150 → **132** · verified, open |
+| #9 | `react/prefer-function-component` | `misc` | #10 | 1 of 2 | **escalated**, open |
 
-**25 findings cleared across two languages and two toolchains**, zero suppressions added, zero escalations. PR #7 is the ratchet.
+**44 findings across five gates and two languages**, zero suppressions added, one
+escalation. PR #7 is the ratchet. The three open pull requests are left open on
+purpose: a verified PR waiting on a human is the state this design intends, and
+merging them to make a table look tidier would misrepresent it.
 
-Two results worth more than the counts:
+Three results worth more than the counts:
 
 **PR #4 fixed 15 findings in one file** because one early `return` sat above 15 hook calls — a feature flag that changed how many hooks React saw between renders. It was fixed by splitting the component, not by deleting hooks: the file *grew* from 661 to 675 lines and every hook survived.
 
 **PR #2 found a crash nobody asked about.** Clearing `jsx-key` in `TimeoutErrorMessage` meant rewriting a `.map().reduce()` — and `reduce` on an empty array with no initial value throws. The component had been crashing whenever its error list was empty. The session reported `behavior_change: true` rather than shipping it silently, and the orchestrator routed it to `needs:human-review`, because a linter cannot tell you whether changed behaviour is *wanted*.
+
+**PR #10 is the escalation, and it is the result I would defend hardest.** Asked to convert two class components, the session converted one and refused the other: react-dnd's legacy `DragSource`/`DropTarget` hand the class *instance* to the hover and drop specs, and four other files read `component.mounted|ref|props|setState` off it. Converting it would have **passed the linter and silently broken drag-and-drop on every dashboard**. It found the fix that satisfies every automated check and makes the product worse, and declined to make it — then volunteered the number that made its own run look worse (*"check 2 printed 1, not 0"*). That string lands in `blocked_reason`, the one field in the output schema that is optional, and the orchestrator turns it into `status:escalated` and a human decision rather than a retry.
 
 ---
 
