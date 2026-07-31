@@ -214,7 +214,12 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--fast", action="store_true", help="no pacing delays")
     args = ap.parse_args()
-    if args.fast:
+    # FAST=1 as well as --fast: the image clears ENTRYPOINT so that CMD is
+    # authoritative, which means `docker compose run simulate --fast` *replaces*
+    # the command rather than appending to it ("--fast: executable file not
+    # found"). An environment variable is the only spelling that works through
+    # both `compose run` and a direct `python simulate.py`.
+    if args.fast or os.environ.get("FAST"):
         PACE = 0.0
 
     fixtures = sorted(FIXTURES.glob("issue-*.json"))

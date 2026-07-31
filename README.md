@@ -92,7 +92,7 @@ docker compose run --rm simulate
 
 `run` rather than `up`, so only this service starts. It mounts nothing and reads
 no environment: the fixtures are baked into the image, so it behaves identically
-on any machine. Runtime is about a minute; add `--fast` to skip the pacing.
+on any machine. Runtime is about a minute; `-e FAST=1` skips the pacing.
 
 Simulate replays the recorded sessions behind the merged pull requests below,
 narrating the orchestrator's real decision sequence: detect → file → launch →
