@@ -28,6 +28,8 @@ A quality gate is two things: a **checker** and an **enforcement switch**. Super
 | mypy `warn_unused_ignores` | disabled for 8 modules | 49 | `pyproject.toml` |
 | zizmor (Actions security) | `--no-exit-codes` | 1 | `.pre-commit-config.yaml` |
 
+**Two of these six have runners here** — oxlint and mypy, covering five of the rules above. The rest are measured and documented in `baseline/` but not yet automated; adding one means writing a function that returns a list of `Finding`, and nothing downstream changes. See *Why an agent* for what was deliberately left out and why.
+
 The `zizmor` config states the deadlock outright:
 
 ```yaml
@@ -58,14 +60,36 @@ docker compose up
 docker compose --profile simulate up
 ```
 
-Simulate mode replays recorded sessions from `ratchet/fixtures/`. No credentials, no spend, same pipeline.
+**Start here if you are evaluating this.** Simulate mode replays the three sessions that produced the three merged pull requests below, narrating the orchestrator's real decision sequence: detect → file → launch → Devin works → structured report → independent verification → human merges.
+
+The fixtures in `ratchet/fixtures/` are **recorded API responses and message streams from those actual runs** — not synthetic data. No credentials are read: `simulate.py` refuses to touch a credential even if one is present in the environment.
+
+---
+
+## What it did
+
+Against [`CognitionTakeHomeOrg/superset-adham-clone`](https://github.com/CognitionTakeHomeOrg/superset-adham-clone), pinned to `9f5611aca5`. Every issue was filed by the detector, every pull request opened by a Devin session, every one verified independently before a human merged it.
+
+| Issue | Gate | Unit | PR | Findings | Result |
+|---|---|---|---|---|---|
+| #1 | `react/jsx-key` | `src/components` | #2 | 4 | 81 → **77** |
+| #3 | `react-hooks/rules-of-hooks` | `src/pages` | #4 | 15 | 47 → **32** |
+| #5 | mypy `unused-ignore` | `superset/semantic_layers` | #6 | 6 | 49 → **43** |
+
+**25 findings cleared across two languages and two toolchains**, zero suppressions added, zero escalations. PR #7 is the ratchet.
+
+Two results worth more than the counts:
+
+**PR #4 fixed 15 findings in one file** because one early `return` sat above 15 hook calls — a feature flag that changed how many hooks React saw between renders. It was fixed by splitting the component, not by deleting hooks: the file *grew* from 661 to 675 lines and every hook survived.
+
+**PR #2 found a crash nobody asked about.** Clearing `jsx-key` in `TimeoutErrorMessage` meant rewriting a `.map().reduce()` — and `reduce` on an empty array with no initial value throws. The component had been crashing whenever its error list was empty. The session reported `behavior_change: true` rather than shipping it silently, and the orchestrator routed it to `needs:human-review`, because a linter cannot tell you whether changed behaviour is *wanted*.
 
 ---
 
 ## How it works
 
 ```
-   gate (oxlint / mypy / zizmor)
+   gate (oxlint · mypy)
         │  measured on a clean tree, at CI's exact scope
         ▼
    detector ──► GitHub issue          ◄── the event
@@ -130,14 +154,28 @@ This matters concretely: `oxlint --fix` on this repository deleted a user-facing
 
 ### 5. The ratchet
 
+```bash
+python ratchet/orchestrator/ratchet.py --auto          # what would change
+python ratchet/orchestrator/ratchet.py --auto --push   # open/update the PR
+```
+
 Two modes:
 
-- **full** — the debt reached zero, so promote the rule to `"error"`. The defect class becomes impossible to reintroduce.
-- **counting** — the debt did not reach zero, so freeze it. Today's count is committed as a ceiling and CI fails any PR that raises it.
+- **full** — a gate reached zero, so promote the rule to `"error"`. The defect class becomes impossible to reintroduce.
+- **counting** — it did not, so freeze it. Today's counts are committed as ceilings and CI fails any pull request that raises one.
 
-The tool refuses to fire a full ratchet while findings remain, because flipping the switch early breaks the build for the next person to push anything at all.
+The tool **refuses** to fire a full ratchet while findings remain, because flipping the switch early breaks the build for the next person to push anything at all.
 
-Counting mode is what makes this apply to debt too large to ever hand-clear — the 557 `prefer-destructuring` findings nobody is going to fix by hand can still be stopped from growing.
+Counting mode is what makes this apply to debt too large to ever hand-clear. It does not require finishing.
+
+**This runs automatically.** The thesis of the whole system is that cleanup fails because it depends on someone paying attention — so a ratchet a human has to remember to crank would reintroduce exactly that failure. The PR is opened and kept current by the system on every gate improvement, and updated in place rather than duplicated. **Merging stays human**: turning on a check that can fail everyone's build is a policy decision.
+
+The PR ships `scripts/ratchet_check.py`, the committed ceilings, the pinned mypy config, and a **GitHub Actions workflow** — without that last piece a ceiling is a document, not a constraint. Verified in both directions: it passes at the committed counts, and introducing one unkeyed `.map()` produces
+
+```
+react/jsx-key    78    77    REGRESSION +1
+error: react/jsx-key rose from 77 to 78.
+```
 
 ---
 
@@ -147,7 +185,9 @@ Counting mode is what makes this apply to debt too large to ever hand-clear — 
 
 **Gates closed** is the headline, because it is the only metric on the page that does not decay. Findings-fixed regrows the moment attention moves elsewhere — that is precisely what happened to the 1,453 findings already printed in every CI run.
 
-Also reported: per-gate burndown, escalation rate next to success rate, and cost per **merged** PR (not per attempt — spend on discarded work is still spend).
+Also reported: per-gate burndown across all five gates, escalation rate next to success rate, and cost per **merged** PR (not per attempt — spend on discarded work is still spend).
+
+**Cost currently reads `n/a`, deliberately.** Devin's API has returned `acus_consumed: 0.0` for every session so far, including completed ones that opened pull requests. Dividing by that would publish "$0.00 per merged PR", which reads as either broken or dishonest, so the panel declares the number unavailable and says why. The budget controls below are live regardless — they cap before spending, not after measuring it.
 
 **False positives are subtracted from each gate's denominator.** Four of the 47 `rules-of-hooks` findings are in `playwright/`, where the code is `await use(fixture)` — Playwright's fixture callback, not React's `use` hook. The linter matched on the name. The real number is 43, and the ratchet PR needs a `playwright/**` override or it would fail the build on code that was never broken.
 
@@ -164,6 +204,23 @@ Also reported: per-gate burndown, escalation rate next to success rate, and cost
 
 ---
 
+## Where the human is
+
+Nothing in this system merges anything. The state machine stops at `verifying` and waits.
+
+```
+Devin reports "done"        →  treated as evidence, never as proof
+verify.py re-runs the oracle →  automated, 7–9 checks depending on the gate
+behaviour change declared    →  labelled needs:human-review, with the rationale
+merge                        →  HUMAN, always
+ratchet PR opened            →  automatic
+ratchet PR merged            →  HUMAN, always
+```
+
+The split is deliberate and consistent: **automate the noticing, never the deciding.** Finding debt, filing it, remediating it, and proving the fix are all mechanical. Accepting a behaviour change, and turning on a check that can fail everyone's build, are not.
+
+---
+
 ## Layout
 
 ```
@@ -175,16 +232,21 @@ ratchet/
 │   └── detect.py      the event source; idempotent
 ├── orchestrator/
 │   ├── devin.py       Devin API v3 client + structured output schema
-│   ├── prompt.py      the contract sent to each session
+│   ├── prompt.py      the contract sent to each session (oxlint + mypy variants)
 │   ├── run.py         launch, poll, settle (verify / escalate / expire)
 │   ├── verify.py      independent re-check — the non-negotiable one
-│   ├── ratchet.py     the capstone PR, full and counting modes
+│   ├── ratchet.py     the capstone PR, opened automatically
 │   ├── webhook.py     HMAC-verified receiver + reconciler
+│   ├── dashboard.py   gates closed, burndown, escalation rate
+│   ├── simulate.py    replay recorded sessions; no key, no network, no spend
 │   └── state.py       SQLite; the budget ledger survives restarts
-├── Dockerfile
-└── fixtures/          recorded sessions for simulate mode
+├── gates/             mypy gate config + its control
+├── fixtures/          recorded sessions for simulate mode
+└── Dockerfile
 baseline/              committed scans at 9f5611aca5 — the deltas' denominator
 ```
+
+`gates/mypy-control.ini` is not dead weight. It replicates `pyproject.toml`'s mypy settings exactly, *including* the `warn_unused_ignores = false` override that `mypy-unused-ignore.ini` removes. The control running clean across 1,423 files is what proves the two configs differ in one variable and nothing else — without it, 49 is just a number a tool printed.
 
 ### Notes on the Devin API
 
@@ -201,3 +263,15 @@ Remediation is not, and the reason is sharper than "it's hard": **the wrong fix 
 Choosing a correct key requires reading the data to find a stable identifier. Fixing a conditional hook requires restructuring a component without changing what it renders. Those are judgement calls with a machine-checkable answer — which is the exact shape of work worth giving an autonomous agent, and the exact shape a codemod cannot do.
 
 One session in this repository fixed 4 `jsx-key` findings and reported back `behavior_change: true`: the component had been crashing whenever its error list was empty, because `reduce` was called on an empty array with no initial value. Nobody asked it to look for that. It fixed it, and it said so, instead of shipping it silently.
+
+`oxlint --fix` was tested on this repository as a control. On `no-console` it deleted a user-facing i18n warning and left an empty statement behind — with type-check and tests both green. That diff is the argument in one artifact: **a wrong fix is very often the easiest fix to automate.**
+
+---
+
+## Scope, and what was left out
+
+Deliberately excluded: `prefer-destructuring` (557 findings) and `exhaustive-deps` (374). Together they are roughly 64% of Superset's own tech-debt metric, and clearing them would move that number more than everything here combined. They were declined because neither has a correctness argument a reviewer would thank you for — one is stylistic, and the other frequently requires changing when effects fire. Volume is not the goal; closing gates is.
+
+`no-unstable-nested-components` (150) and `ban-ts-comment` (197) are measured and **frozen by the ratchet** — capped so they cannot grow — but not yet remediated. zizmor's single finding is measured in `baseline/` only; it has no runner and is not in the ratchet.
+
+**Four of the 47 `rules-of-hooks` findings are false positives**, all in `playwright/`: the code is `await use(fixture)` — Playwright's fixture callback, not React's `use` hook. The linter matched on the name. The real number is 43, the dashboard subtracts them from the denominator, and a full ratchet on that rule will need a `playwright/**` override. Finding this cost fifteen minutes of reading; missing it would have failed a build on code that was never broken.
