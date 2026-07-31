@@ -172,6 +172,9 @@ Three results worth more than the counts:
 ## How it works
 
 ```
+   cron: 0 6 * * *                     ◄── nothing here is hand-started
+        │  six gates, one job each, in parallel
+        ▼
    gate (oxlint · mypy)
         │  measured on a clean tree, at CI's exact scope
         ▼
@@ -185,6 +188,53 @@ Three results worth more than the counts:
         │         our container, our oracle, not the session's self-report
         ▼
    ratchet PR: switch → "error"       ◄── the point
+```
+
+### 0. The trigger
+
+[`.github/workflows/detect.yml`](.github/workflows/detect.yml). A schedule, because a
+system that only runs when someone remembers to run it is the failure this project
+exists to attack:
+
+```yaml
+on:
+  schedule:
+    - cron: "0 6 * * *"    # 06:00 UTC daily — findings that appear
+                           # overnight are filed before standup
+  workflow_dispatch:       # manual, for a single workstream
+```
+
+Six jobs, one per gate, `fail-fast: false` so a mypy failure cannot silence the
+oxlint ones. Each checks out the repository under measurement at the pinned
+baseline, installs that gate's exact toolchain — `npm ci` for oxlint, the
+stub-only venv for mypy — and runs the detector with `--apply`.
+
+Two asymmetries are deliberate:
+
+- **`--apply` is implicit on the schedule and opt-in on a manual run.** A hand-triggered
+  run is a dry run unless you ask for issues, so nobody files fifty issues by
+  reflex while testing.
+- **The ratchet step only fires on the schedule** — not on `workflow_dispatch` —
+  so a dry run can never touch the capstone PR.
+
+Running on a schedule is only safe because the detector is idempotent: each unit
+carries a fingerprint hashed from `(rule, area)`, deliberately not from line
+numbers or counts, so a second run edits the existing issue instead of opening a
+duplicate. See *Grouping* below.
+
+Configuration lives in repository variables and one secret:
+
+| | |
+|---|---|
+| `vars.FORK_REPO` | the repository under measurement |
+| `vars.BASELINE_SHA` | the commit every delta is measured against |
+| `secrets.RATCHET_GITHUB_TOKEN` | checkout + issue/PR write |
+
+Run one gate by hand:
+
+```bash
+gh workflow run detect -f workstream=C -f apply=false     # dry run
+python ratchet/detector/detect.py --workstream C          # or locally
 ```
 
 ### 1. Detection
@@ -251,7 +301,7 @@ The tool **refuses** to fire a full ratchet while findings remain, because flipp
 
 Counting mode is what makes this apply to debt too large to ever hand-clear. It does not require finishing.
 
-**This runs automatically.** The thesis of the whole system is that cleanup fails because it depends on someone paying attention — so a ratchet a human has to remember to crank would reintroduce exactly that failure. The PR is opened and kept current by the system on every gate improvement, and updated in place rather than duplicated. **Merging stays human**: turning on a check that can fail everyone's build is a policy decision.
+**This runs automatically**, on the same nightly schedule as the detector — [`detect.yml:94-104`](.github/workflows/detect.yml#L94-L104) calls `ratchet.py --auto --push` after the gates have been measured, gated on `github.event_name == 'schedule'` so a manual dry run can never touch it. The thesis of the whole system is that cleanup fails because it depends on someone paying attention — so a ratchet a human has to remember to crank would reintroduce exactly that failure. The PR is updated in place rather than duplicated. **Merging stays human**: turning on a check that can fail everyone's build is a policy decision.
 
 The PR ships `scripts/ratchet_check.py`, the committed ceilings, the pinned mypy config, and a **GitHub Actions workflow** — without that last piece a ceiling is a document, not a constraint. Verified in both directions: it passes at the committed counts, and introducing one unkeyed `.map()` produces
 
