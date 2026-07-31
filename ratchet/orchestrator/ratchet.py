@@ -72,8 +72,31 @@ GATES = {
 
 BRANCH = "ratchet/counting-baseline"
 
-CHECK_SCRIPT = '''#!/usr/bin/env python3
-"""Counting ratchet.
+# Apache RAT checks every file for this header and the ratchet PR is not exempt.
+# Nor should it be: a pull request that turns on enforcement while failing the
+# project's existing gates would be the most embarrassing possible artifact.
+ASF_HEADER_PY = '''#!/usr/bin/env python3
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+'''
+
+ASF_HEADER_INI = ASF_HEADER_PY.replace("#!/usr/bin/env python3\n", "")
+
+CHECK_SCRIPT = ASF_HEADER_PY + '''"""Counting ratchet.
 
 Fails when any gate's finding count rises above its committed ceiling.
 
@@ -108,34 +131,70 @@ OXLINT = "./node_modules/.bin/oxlint"
 MYPY_LINE = re.compile(r"^[^:]+:\\d+: error: .*\\[(?P<code>[\\w-]+)\\]$")
 
 
-def count_oxlint(rule):
-    out = subprocess.run(
-        [OXLINT, "--config", "oxlint.json", "-A", "all", "-D", rule, "--format", "json"],
-        cwd=FRONTEND, capture_output=True, text=True,
+def count_oxlint(rule: str) -> int:
+    """Count findings for one oxlint rule.
+
+    `-A all -D <rule>` disables everything, then enables exactly one at error
+    severity, so the number cannot drift because an unrelated rule changed.
+    """
+    out = subprocess.run(  # noqa: S603  # fixed argv, no shell, no user input
+        [
+            OXLINT,
+            "--config",
+            "oxlint.json",
+            "-A",
+            "all",
+            "-D",
+            rule,
+            "--format",
+            "json",
+        ],
+        cwd=FRONTEND,
+        capture_output=True,
+        text=True,
+        check=False,
     ).stdout
     return len(json.loads(out).get("diagnostics", [])) if out.strip() else 0
 
 
-def count_mypy(code, mypy_bin):
-    out = subprocess.run(
-        [mypy_bin, "--config-file", str(ROOT / "ratchet-mypy.ini"),
-         "--check-untyped-defs", "--no-color-output", "--no-error-summary", "superset/"],
-        cwd=ROOT, capture_output=True, text=True,
+def count_mypy(code: str, mypy_bin: str) -> int:
+    """Count mypy errors of one code, in the isolated gate environment."""
+    out = subprocess.run(  # noqa: S603  # fixed argv, no shell, no user input
+        [
+            mypy_bin,
+            "--config-file",
+            str(ROOT / "ratchet-mypy.ini"),
+            "--check-untyped-defs",
+            "--no-color-output",
+            "--no-error-summary",
+            "superset/",
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
     ).stdout
-    return sum(1 for ln in out.splitlines()
-               if (m := MYPY_LINE.match(ln.strip())) and m.group("code") == code)
+    return sum(
+        1
+        for ln in out.splitlines()
+        if (m := MYPY_LINE.match(ln.strip())) and m.group("code") == code
+    )
 
 
-def main():
+def main() -> int:
     mypy_bin = BASELINE.get("mypy_bin", "mypy")
-    failed = []
+    failed: list[tuple[str, int, int]] = []
     print(f"{'gate':<40} {'now':>6} {'ceiling':>8}   verdict")
     print("-" * 72)
     for gate, spec in sorted(BASELINE["gates"].items()):
         ceiling = spec["ceiling"]
         try:
-            now = count_oxlint(gate) if spec["kind"] == "oxlint" else count_mypy(gate, mypy_bin)
-        except Exception as e:
+            now = (
+                count_oxlint(gate)
+                if spec["kind"] == "oxlint"
+                else count_mypy(gate, mypy_bin)
+            )
+        except (OSError, ValueError, json.JSONDecodeError) as e:
             print(f"{gate:<40} {'?':>6} {ceiling:>8}   SKIPPED ({type(e).__name__})")
             continue
         if now > ceiling:
@@ -152,8 +211,11 @@ def main():
         print()
         for gate, now, ceiling in failed:
             print(f"error: {gate} rose from {ceiling} to {now}.", file=sys.stderr)
-        print("\\nFix the new findings, or -- if you are deliberately removing this "
-              "code -- lower the ceiling in ratchet-baseline.json.", file=sys.stderr)
+        print(
+            "\\nFix the new findings, or -- if you are deliberately removing this "
+            "code -- lower the ceiling in ratchet-baseline.json.",
+            file=sys.stderr,
+        )
         return 1
 
     print("\\nAll gates held or improved.")
@@ -173,6 +235,12 @@ WORKFLOW = """\
 #
 # It does not demand zero. It demands "no worse than the committed ceiling",
 # which is a bar this repository can actually hold today.
+#
+# Actions are pinned by digest and permissions are declared explicitly, because
+# this repository's own zizmor audit requires both -- and a pull request that
+# turns on enforcement while failing an existing gate would be the most
+# embarrassing artifact this project could produce. The digests match the ones
+# already used across the other 36 workflows here.
 name: ratchet
 
 on:
@@ -180,15 +248,24 @@ on:
   push:
     branches: [master]
 
+permissions:
+  contents: read
+
 jobs:
   counting-ratchet:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing here pushes; leaving the token in .git/config would let any
+          # later step, or a compromised dependency, use it.
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: superset-frontend/.nvmrc
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.11"
       - name: install frontend deps
@@ -280,7 +357,8 @@ def main() -> int:
     (repo / "scripts" / "ratchet_check.py").write_text(CHECK_SCRIPT)
     (repo / "scripts" / "ratchet_check.py").chmod(0o755)
     (repo / "ratchet-mypy.ini").write_text(
-        (Path(__file__).parents[1] / "gates" / "mypy-unused-ignore.ini").read_text())
+        ASF_HEADER_INI
+        + (Path(__file__).parents[1] / "gates" / "mypy-unused-ignore.ini").read_text())
     (repo / ".github" / "workflows").mkdir(parents=True, exist_ok=True)
     (repo / ".github" / "workflows" / "ratchet.yml").write_text(WORKFLOW)
 
@@ -349,9 +427,15 @@ everyone's build.</sub>
                    "--state", "open", "--json", "number", "--jq", ".[0].number"],
                   repo, check=False).strip()
     if existing:
-        sh(["gh", "pr", "edit", existing, "--repo", repo_name,
-            "--title", title, "--body", body], repo)
-        print(f"updated PR #{existing}")
+        # Non-fatal. The branch push above is what actually updates the pull
+        # request's diff; refreshing title and body is cosmetic, and `gh pr edit`
+        # currently fails against this repo with a Projects-classic GraphQL
+        # deprecation that has nothing to do with us. Aborting here would leave
+        # the caller thinking the ratchet had not been updated when it had.
+        r = sh(["gh", "pr", "edit", existing, "--repo", repo_name,
+                "--title", title, "--body", body], repo, check=False)
+        print(f"updated PR #{existing}"
+              + ("" if r is not None else " (branch pushed; body refresh failed)"))
     else:
         url = sh(["gh", "pr", "create", "--repo", repo_name, "--base", "master",
                   "--head", BRANCH, "--title", title, "--body", body,
