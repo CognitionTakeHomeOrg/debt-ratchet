@@ -99,6 +99,45 @@ def coverage(rows: list[dict]) -> dict[str, bool]:
     return {g: any(g in t for t in tracked) for g in OUR_GATES}
 
 
+def blind_spot(repo_root: Path) -> dict:
+    """Why none of the ratcheted gates appear on Superset's dashboard.
+
+    Their CI lint step and their tech-debt uploader run *different commands*:
+
+        package.json "lint"        npx oxlint --config oxlint.json --quiet
+        oxlint-metrics-uploader.js npx oxlint --format json          <- no --config
+
+    Without `--config`, oxlint falls back to its own built-in defaults and never
+    loads `oxlint.json`. So every rule Superset deliberately configured --
+    including all four carrying an enforcement switch -- is invisible to the
+    dashboard, while being counted in every CI run.
+
+    This is not a criticism of the dashboard's design; it is the clearest
+    available statement of the problem. The debt is measured daily and reported
+    nowhere, and the measurement everyone looks at is a different measurement
+    from the one that runs.
+    """
+    import json
+    import subprocess
+
+    fe = repo_root / "superset-frontend"
+    binary = "./node_modules/.bin/oxlint"
+
+    def count(args: list[str]) -> int:
+        out = subprocess.run([binary, *args, "--format", "json"], cwd=fe,
+                             capture_output=True, text=True).stdout
+        return len(json.loads(out).get("diagnostics", [])) if out.strip() else 0
+
+    configured = count(["--config", "oxlint.json"])
+    default = count([])
+    return {
+        "ci_lint": configured,
+        "dashboard": default,
+        "invisible": configured - default,
+        "pct_invisible": round(100 * (configured - default) / configured) if configured else 0,
+    }
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--refresh", action="store_true")
@@ -127,9 +166,22 @@ def main() -> int:
     print("  Gates this system ratchets, as tracked by that dashboard:")
     for gate, present in coverage(rows).items():
         print(f"    {gate:<34} {'tracked' if present else 'NOT TRACKED'}")
-    print()
-    print("  The debt sitting behind the enforcement switches is not on the")
-    print("  dashboard at all. It is counted in every CI run and reported nowhere.")
+
+    repo = Path(__file__).resolve().parents[2] / "superset-adham-clone"
+    if (repo / "superset-frontend" / "node_modules" / ".bin" / "oxlint").exists():
+        b = blind_spot(repo)
+        print()
+        print("  And the reason is not that anyone chose to ignore them:")
+        print()
+        print(f"    npm run lint   --config oxlint.json    {b['ci_lint']:>6}   <- what CI counts")
+        print(f"    lint-stats     (no --config)           {b['dashboard']:>6}   <- what the dashboard sees")
+        print(f"    {'':39} {'-' * 6}")
+        print(f"    invisible to the dashboard             {b['invisible']:>6}   ({b['pct_invisible']}%)")
+        print()
+        print("  The uploader omits --config, so oxlint falls back to its built-in")
+        print("  defaults and never loads oxlint.json. Every rule Superset")
+        print("  deliberately configured -- including all four with an enforcement")
+        print("  switch -- is counted in every CI run and reported nowhere.")
     return 0
 
 
