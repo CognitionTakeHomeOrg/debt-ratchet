@@ -52,7 +52,14 @@ def connect(root: Path) -> sqlite3.Connection:
     # with "unable to open database file" on every fresh checkout.
     db = Path(os.environ["STATE_DB"]) if os.environ.get("STATE_DB") else root / "ratchet" / "state.db"
     db.parent.mkdir(parents=True, exist_ok=True)
-    con = sqlite3.connect(db)
+    # The ledger has concurrent writers by design: the webhook launches, the
+    # reconciler launches, and the poller settles, each in its own process. A
+    # burst of webhook deliveries makes them collide, and the default behaviour
+    # is to raise "database is locked" immediately -- turning contention into a
+    # crash rather than a wait. WAL lets readers run while one writer commits.
+    con = sqlite3.connect(db, timeout=15)
+    con.execute("PRAGMA journal_mode=WAL")
+    con.execute("PRAGMA busy_timeout=15000")
     con.row_factory = sqlite3.Row
     con.executescript(SCHEMA)
     existing = {r["name"] for r in con.execute("PRAGMA table_info(sessions)")}
@@ -77,6 +84,46 @@ def record(con: sqlite3.Connection, **kw) -> None:
     cols = ",".join(kw)
     marks = ",".join("?" for _ in kw)
     con.execute(f"INSERT OR REPLACE INTO sessions ({cols}) VALUES ({marks})", list(kw.values()))
+    con.commit()
+
+
+def claim(con: sqlite3.Connection, **kw) -> bool:
+    """Reserve a fingerprint before any money is spent. False if already taken.
+
+    `idx_open_fingerprint` exists to stop two sessions working the same unit, but
+    an index only helps if the write can fail: `INSERT OR REPLACE` resolves the
+    conflict by deleting the row it collides with, so the guard silently did
+    nothing. Worse, the insert happened *after* `create_session`, so by the time
+    the ledger noticed a duplicate the ACUs were already committed.
+
+    Creating an issue with two labels emits three webhook deliveries -- `opened`
+    plus one `labeled` each -- and all three arrive within the same second, so no
+    check that reads before writing can separate them. This is the write that
+    decides, and only one caller can win it.
+    """
+    cols = ",".join(kw)
+    marks = ",".join("?" for _ in kw)
+    try:
+        con.execute(f"INSERT INTO sessions ({cols}) VALUES ({marks})", list(kw.values()))
+        con.commit()
+        return True
+    except sqlite3.IntegrityError:
+        return False
+
+
+def promote(con: sqlite3.Connection, claim_id: str, session_id: str, url: str) -> None:
+    """Swap a claim for the session it reserved."""
+    con.execute(
+        "UPDATE sessions SET session_id=?, session_url=?, status='running',"
+        " updated_at=CURRENT_TIMESTAMP WHERE session_id=?",
+        (session_id, url, claim_id),
+    )
+    con.commit()
+
+
+def release(con: sqlite3.Connection, claim_id: str) -> None:
+    """Give the fingerprint back when the session was never created."""
+    con.execute("DELETE FROM sessions WHERE session_id=?", (claim_id,))
     con.commit()
 
 

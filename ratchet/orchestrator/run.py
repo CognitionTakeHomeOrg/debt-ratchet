@@ -152,19 +152,43 @@ def launch(args, root: Path, env: dict, con) -> int:
         print(text)
         return 0
 
+    # Claim the unit BEFORE spending anything.
+    #
+    # `gh issue create` with two labels emits three webhook deliveries -- opened,
+    # and one labeled per label -- inside the same second. Each is a valid
+    # trigger, so three launchers ran concurrently and Devin created three
+    # sessions for one unit: triple the ACUs, three near-identical pull requests,
+    # and two of them invisible to the ledger. The API's idempotency key did not
+    # help, because all three requests were in flight before any had returned.
+    #
+    # A unique partial index on the fingerprint decides the winner, and it has to
+    # be written before `create_session` -- a check afterwards can only report a
+    # duplicate that already cost money.
+    claim_id = f"pending:{fp}"
+    if not state.claim(
+        con, session_id=claim_id, issue_number=args.issue, fingerprint=fp,
+        workstream=workstream, rule=rule, area=unit.area,
+        findings=len(unit.findings), status="queued",
+    ):
+        print(f"issue #{args.issue}: a session for {fp} is already in flight "
+              f"-- not starting a second", file=sys.stderr)
+        return 0
+
     client = DevinClient(env["DEVIN_API_KEY"], env["DEVIN_ORG_ID"], env["DEVIN_API_BASE"])
-    sess = client.create_session(
-        prompt=text,
-        title=f"[{unit.ident}] {rule} in {unit.area}",
-        tags=["debt-ratchet", f"workstream:{workstream}", f"issue:{args.issue}"],
-        max_acu=per_session,
-        idem_key=f"ratchet-{fp}",
-    )
-    state.record(
-        con, session_id=sess.session_id, issue_number=args.issue, fingerprint=fp,
-        workstream=workstream, rule=rule, area=unit.area, findings=len(unit.findings),
-        status="running", session_url=sess.url,
-    )
+    try:
+        sess = client.create_session(
+            prompt=text,
+            title=f"[{unit.ident}] {rule} in {unit.area}",
+            tags=["debt-ratchet", f"workstream:{workstream}", f"issue:{args.issue}"],
+            max_acu=per_session,
+            idem_key=f"ratchet-{fp}",
+        )
+    except Exception:
+        # Nothing was created, so the unit must not stay reserved -- otherwise a
+        # transient API error locks it out until someone edits the database.
+        state.release(con, claim_id)
+        raise
+    state.promote(con, claim_id, sess.session_id, sess.url)
     relabel(repo, args.issue, "devin:in-progress", ["devin:queued"])
 
     # Post the session link on the issue at launch, not at completion.
