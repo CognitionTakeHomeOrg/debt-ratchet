@@ -22,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).parents[1] / "detector"))
 
 import prompt as prompt_mod  # noqa: E402
 import state  # noqa: E402
-from devin import DevinClient, load_env  # noqa: E402
+from devin import DevinClient, fork_path, load_env  # noqa: E402
 from gates import GATES_DIR, assert_clean_tree, production_only, run_mypy, run_oxlint  # noqa: E402
 from grouping import group  # noqa: E402
 
@@ -124,7 +124,7 @@ def launch(args, root: Path, env: dict, con) -> int:
     # Re-derive the findings from the gate rather than parsing them back out of
     # the issue body. The issue is a human-facing artifact; the gate is the
     # source of truth, and it may have moved since the issue was filed.
-    repo_path = (root / "superset-adham-clone").resolve()
+    repo_path = fork_path(root)
     assert_clean_tree(repo_path)
     is_mypy = workstream in MYPY_WORKSTREAMS
     all_findings = run_mypy(repo_path) if is_mypy else run_oxlint(repo_path, rule)

@@ -218,16 +218,44 @@ python -m venv .mypy-gate
 
 ### The full system
 
-Two prerequisites, and both are load-bearing:
+> ### ⚠️ Fork the repository under measurement first
+>
+> **You must run this against a fork you own.** Filing issues needs write access
+> and registering the webhook needs repository **admin** — neither of which you
+> have on `CognitionTakeHomeOrg/superset-adham-clone`, and GitHub has no setting
+> that grants them publicly. That is correct rather than inconvenient: the hook
+> launches Devin sessions that spend a specific organisation's ACUs, so it has to
+> be the repository owner's decision.
+>
+> ```bash
+> gh repo fork CognitionTakeHomeOrg/superset-adham-clone --clone
+> ```
+>
+> Then set `FORK_REPO` to your fork, and `FORK_PATH` if you clone it under a
+> different name. Nothing else changes — `BASELINE_SHA` exists in every fork of
+> Superset, so every number in this README reproduces, and the seven labels the
+> system uses are created on first `--apply` (forks do not inherit custom labels,
+> and `gh issue create --label` fails on one that does not exist).
+>
+> **Only this section needs any of that.** Simulate, the dashboard and every
+> detector dry run work on a bare clone with no account, no fork and no key.
+
+Three prerequisites, all load-bearing:
 
 ```bash
-# 1. the repository under measurement -- a separate clone, because this repo
-#    measures Superset rather than living inside it
-git clone https://github.com/CognitionTakeHomeOrg/superset-adham-clone
+# 1. your fork of the repository under measurement -- a separate clone, because
+#    this repo measures Superset rather than living inside it
+gh repo fork CognitionTakeHomeOrg/superset-adham-clone --clone -- superset-adham-clone
 git -C superset-adham-clone checkout 9f5611aca5
 
-# 2. credentials
-cp .env.example .env      # DEVIN_API_KEY, DEVIN_ORG_ID, FORK_REPO, GITHUB_WEBHOOK_SECRET
+# 2. credentials -- your own Devin organisation, and a webhook secret
+cp .env.example .env
+#   FORK_REPO=<you>/superset-adham-clone
+#   DEVIN_API_KEY, DEVIN_ORG_ID
+#   GITHUB_WEBHOOK_SECRET=$(openssl rand -hex 24)
+
+# 3. gh, authenticated as the owner of that fork
+gh auth status
 
 docker compose up
 ```
@@ -291,6 +319,29 @@ tunnel but not the receiver behind it. Signatures are HMAC-verified against
 `GITHUB_WEBHOOK_SECRET`, and the handler ignores anything that is not a
 detector-filed issue carrying `devin:queued` — without that check, any human
 opening any issue would start a paid session.
+
+### Running it against your own fork
+
+Registering a webhook requires repository **admin**, which you will not have on
+someone else's fork — GitHub has no setting that grants that publicly, and there
+should not be one: the hook launches sessions that spend a Devin organisation's
+ACUs, so it has to be the repository owner's decision.
+
+Point the system at a repository you own. Nothing else changes:
+
+```bash
+gh repo fork CognitionTakeHomeOrg/superset-adham-clone --clone
+# in .env:
+#   FORK_REPO=<you>/superset-adham-clone
+#   BASELINE_SHA=9f5611aca5425416d6eecd9ebe68fa3c865c4abe   (exists in every fork)
+```
+
+`tunnel.py` checks this before it does anything and says so, rather than failing
+with a 404 three API calls later.
+
+You will also need your own `DEVIN_API_KEY` and `DEVIN_ORG_ID`. **Everything that
+does not spend money runs with no credentials at all** — simulate, the dashboard,
+and every detector dry run.
 
 ### Poll the sessions
 

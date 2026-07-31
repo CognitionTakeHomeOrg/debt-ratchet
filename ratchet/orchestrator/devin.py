@@ -27,6 +27,18 @@ def load_env(root: Path) -> dict:
     return {**env, **os.environ}
 
 
+def fork_path(root: Path) -> Path:
+    """Where the repository under measurement is checked out.
+
+    Configurable rather than hardcoded, because the only way to run this against
+    a repository you own is to fork it -- and a fork does not have to keep the
+    upstream's directory name. `FORK_PATH` may be absolute (the container mounts
+    it at /repo) or relative to this repo.
+    """
+    p = load_env(root).get("FORK_PATH") or "superset-adham-clone"
+    return (Path(p) if Path(p).is_absolute() else root / p).resolve()
+
+
 # The verdict Devin must return. Prose would have to be scraped and guessed at;
 # a schema makes the session's own claim machine-readable -- which matters
 # because the orchestrator then goes and checks that claim independently.

@@ -36,7 +36,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 sys.path.insert(0, str(Path(__file__).parents[1] / "detector"))
 
-from devin import load_env  # noqa: E402
+from devin import fork_path, load_env  # noqa: E402
 from gates import run_mypy, run_oxlint  # noqa: E402
 from grouping import area_of, group  # noqa: E402
 
@@ -349,7 +349,7 @@ def main() -> int:
     root = Path(__file__).resolve().parents[2]
     env = load_env(root)
     repo_name = env["FORK_REPO"]
-    repo = (root / "superset-adham-clone").resolve()
+    repo = fork_path(root)
 
     pr = json.loads(sh(
         ["gh", "pr", "view", str(args.pr), "--repo", repo_name, "--json",

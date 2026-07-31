@@ -53,6 +53,41 @@ PRODUCTION_ONLY = {"D"}
 
 GATE_LABEL = {"oxlint": "gate:oxlint", "mypy": "gate:mypy", "zizmor": "gate:zizmor"}
 
+# Every label the system applies, anywhere -- filing here, and `relabel()` in the
+# orchestrator as a session moves through its states.
+#
+# Forks do not inherit custom labels, and `gh issue create --label` fails on a
+# label that does not exist. So on a fresh fork the very first `--apply` would
+# die before writing anything, for a reason that has nothing to do with the gate
+# being measured. Creating them is idempotent and costs one API call.
+LABELS = {
+    "gate:oxlint": ("0e8a16", "Found by the oxlint gate"),
+    "gate:mypy": ("0e8a16", "Found by the mypy gate"),
+    "gate:zizmor": ("0e8a16", "Found by the zizmor gate"),
+    "devin:queued": ("1d76db", "Waiting for a Devin session"),
+    "devin:in-progress": ("fbca04", "A Devin session is working on this"),
+    "status:escalated": ("d93f0b", "Devin stopped and explained why; needs a human"),
+    "needs:human-review": ("d93f0b", "Declared behaviour change; gate checks cannot approve it"),
+}
+
+
+def ensure_labels(repo: str) -> None:
+    """Create any label this system uses that the repository does not have."""
+    out = subprocess.run(
+        ["gh", "label", "list", "--repo", repo, "--limit", "200", "--json", "name"],
+        capture_output=True, text=True,
+    ).stdout
+    have = {l["name"] for l in json.loads(out or "[]")}
+    for name, (color, desc) in LABELS.items():
+        if name in have:
+            continue
+        r = subprocess.run(
+            ["gh", "label", "create", name, "--repo", repo,
+             "--color", color, "--description", desc],
+            capture_output=True, text=True,
+        )
+        print(f"  label {name}: {'created' if r.returncode == 0 else r.stderr.strip()[:60]}")
+
 
 def load_env(root: Path) -> dict:
     env = {}
@@ -86,7 +121,8 @@ def existing_issues(repo: str) -> dict[str, dict]:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--workstream", required=True, choices=sorted(WORKSTREAM_RULES))
-    ap.add_argument("--repo-path", default="superset-adham-clone")
+    ap.add_argument("--repo-path", default=os.environ.get("FORK_PATH", "superset-adham-clone"),
+                    help="checkout under measurement (default: $FORK_PATH)")
     ap.add_argument("--apply", action="store_true", help="actually create issues")
     ap.add_argument("--only-area", help="file only this area (used for the pilot run)")
     args = ap.parse_args()
@@ -132,6 +168,8 @@ def main() -> int:
         print(f"\n(dry run -- would create {creates} and update "
               f"{len(units) - creates}. Pass --apply to do it.)")
         return 0
+
+    ensure_labels(repo)
 
     for u in units:
         title, body = render(u, repo, sha)

@@ -160,9 +160,35 @@ def reconcile_loop(interval: int = 300) -> None:
             print(f"  reconciler error: {e}", flush=True)
 
 
+def settle_loop(interval: int = 60) -> None:
+    """Carry launched sessions through to a verdict.
+
+    Launching is event-driven; settling cannot be. Devin reports progress by
+    being asked, and a pull request appears at a moment nothing notifies us
+    about -- so without this the system starts work correctly and then abandons
+    it: the session runs, the PR opens, and nothing verifies it or says so on
+    the issue. That is a worse outcome than not starting, because it looks like
+    success.
+
+    Runs as a subprocess for the same reason `launch_async` does: sqlite
+    connections are not shared across threads, and a poll that crashes must not
+    take the receiver down with it.
+    """
+    while True:
+        time.sleep(interval)
+        try:
+            subprocess.run(
+                [sys.executable, str(Path(__file__).parent / "run.py"), "--poll"],
+                capture_output=True, text=True, timeout=1800,
+            )
+        except Exception as e:  # a failed sweep must not kill the server
+            print(f"  poller error: {e}", flush=True)
+
+
 def main() -> int:
     port = int(ENV.get("WEBHOOK_PORT", "8099"))
     threading.Thread(target=reconcile_loop, daemon=True).start()
+    threading.Thread(target=settle_loop, daemon=True).start()
     print(f"listening on :{port}  (POST /webhook, GET /health)", flush=True)
     print(f"trigger: issues labelled {TRIGGER_LABEL!r} on {ENV['FORK_REPO']}", flush=True)
     if not ENV.get("GITHUB_WEBHOOK_SECRET"):

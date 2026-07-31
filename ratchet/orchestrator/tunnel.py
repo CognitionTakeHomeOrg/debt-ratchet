@@ -190,6 +190,28 @@ def main() -> int:
               "delivery. Generate one with `openssl rand -hex 24`.", file=sys.stderr)
         return 1
 
+    # Registering a webhook needs repo *admin*, which nobody has on someone
+    # else's repository. Without this check that arrives as a 404 from an API
+    # call three steps later, which reads like a broken tool rather than a
+    # permission you were never going to have.
+    perms = gh("api", f"repos/{REPO}", "--jq", ".permissions.admin // false", check=False)
+    if perms.strip() != "true":
+        print(
+            f"you do not have admin on {REPO}, so you cannot register a webhook there.\n"
+            f"\n"
+            f"Point the system at a repository you own instead -- fork it, then set\n"
+            f"FORK_REPO in .env to your fork. Everything else is unchanged: the\n"
+            f"baseline commit exists in every fork of Superset.\n"
+            f"\n"
+            f"  gh repo fork {REPO} --clone\n"
+            f"  # then edit .env:  FORK_REPO=<you>/superset-adham-clone\n"
+            f"\n"
+            f"Or skip webhooks entirely -- the reconciler needs no inbound network:\n"
+            f"  python ratchet/orchestrator/run.py --poll",
+            file=sys.stderr,
+        )
+        return 1
+
     # The receiver has to be up first: the hook's ping arrives seconds after
     # registration, and a hook whose first delivery fails is indistinguishable
     # from a misconfigured one.
